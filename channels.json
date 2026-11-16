@@ -1,0 +1,21 @@
+[
+  {
+    "channel_name": "GTA 6 Viral Clips",
+    "channel_id": "DEFAULT_PRIMARY",
+    "description_template": "🔥 Daily GTA 6 / Grand Theft Auto VI highlight moment!\n\n👑 Featured Streamer: {streamer_name} ({streamer_handle})\n📺 Watch original full stream: {stream_url}\n\n⚠️ Disclaimer: Content used under fair use policy for entertainment, critique, and commentary highlights. All rights belong to their respective creators.\n\n#Shorts #GTA6 #Gaming #GrandTheftAuto #Viral",
+    "default_tags": [
+      "Shorts",
+      "GTA 6",
+      "GTA VI",
+      "Grand Theft Auto 6",
+      "GTA 6 Clips",
+      "Gaming Shorts",
+      "GTA 6 Gameplay",
+      "Funny Moments",
+      "GTA 6 Live"
+    ],
+    "default_category_id": "20",
+    "default_privacy": "public",
+    "enabled": true
+  }
+]

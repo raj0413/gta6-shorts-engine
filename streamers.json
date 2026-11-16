@@ -1,0 +1,79 @@
+[
+  {
+    "name": "IShowSpeed",
+    "handle": "@IShowSpeed",
+    "channel_id": "UCWsDIT66Ccg_d1H9x_8tBTA",
+    "custom_url": "https://www.youtube.com/@IShowSpeed",
+    "live_url": "https://www.youtube.com/@IShowSpeed/live",
+    "facecam_position": "top-right",
+    "facecam_box": [0.70, 0.03, 0.28, 0.36],
+    "language": "en",
+    "enabled": true
+  },
+  {
+    "name": "Kai Cenat",
+    "handle": "@KaiCenat",
+    "channel_id": "UCGCLsH1A-vI6_aB0y_h5p-w",
+    "custom_url": "https://www.youtube.com/@KaiCenat",
+    "live_url": "https://www.youtube.com/@KaiCenat/live",
+    "facecam_position": "top-left",
+    "facecam_box": [0.03, 0.03, 0.28, 0.36],
+    "language": "en",
+    "enabled": true
+  },
+  {
+    "name": "xQc",
+    "handle": "@xQcOW",
+    "channel_id": "UCmDTrq0LNgPodDOFZiSbsww",
+    "custom_url": "https://www.youtube.com/@xQcOW",
+    "live_url": "https://www.youtube.com/@xQcOW/live",
+    "facecam_position": "top-left",
+    "facecam_box": [0.03, 0.03, 0.28, 0.36],
+    "language": "en",
+    "enabled": true
+  },
+  {
+    "name": "Techno Gamerz",
+    "handle": "@TechnoGamerzOfficial",
+    "channel_id": "UCX8pnu3DYUnx8qy8V_CwLFA",
+    "custom_url": "https://www.youtube.com/@TechnoGamerzOfficial",
+    "live_url": "https://www.youtube.com/@TechnoGamerzOfficial/live",
+    "facecam_position": "bottom-right",
+    "facecam_box": [0.70, 0.60, 0.28, 0.36],
+    "language": "hi",
+    "enabled": true
+  },
+  {
+    "name": "Adin Ross",
+    "handle": "@adinrosslive",
+    "channel_id": "UCa8jWJv5U70p6H5Oq3Zf8-w",
+    "custom_url": "https://www.youtube.com/@adinrosslive",
+    "live_url": "https://www.youtube.com/@adinrosslive/live",
+    "facecam_position": "top-right",
+    "facecam_box": [0.70, 0.03, 0.28, 0.36],
+    "language": "en",
+    "enabled": true
+  },
+  {
+    "name": "Typical Gamer",
+    "handle": "@typicalgamer",
+    "channel_id": "UC2wKfjlioPEHcq_mI0h1d_g",
+    "custom_url": "https://www.youtube.com/@typicalgamer",
+    "live_url": "https://www.youtube.com/@typicalgamer/live",
+    "facecam_position": "bottom-right",
+    "facecam_box": [0.72, 0.60, 0.26, 0.36],
+    "language": "en",
+    "enabled": true
+  },
+  {
+    "name": "Summit1g",
+    "handle": "@summit1g",
+    "channel_id": "UC12US-S70T3K9b66Jv7X6kg",
+    "custom_url": "https://www.youtube.com/@summit1g",
+    "live_url": "https://www.youtube.com/@summit1g/live",
+    "facecam_position": "top-right",
+    "facecam_box": [0.70, 0.03, 0.28, 0.36],
+    "language": "en",
+    "enabled": true
+  }
+]

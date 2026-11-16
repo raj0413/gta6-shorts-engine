@@ -1,0 +1,19 @@
+# Core Video & Audio Processing
+yt-dlp>=2024.10.0
+numpy>=1.24.0
+scipy>=1.10.0
+openai-whisper>=20231117
+
+# Google Gemini AI (Viral Curation & Title Generation)
+google-genai>=0.1.1
+google-generativeai>=0.8.0
+
+# YouTube Data API v3 & OAuth2 Publishing
+google-api-python-client>=2.110.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+
+# HTTP & Utilities
+requests>=2.31.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0

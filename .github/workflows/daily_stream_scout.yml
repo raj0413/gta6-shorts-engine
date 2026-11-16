@@ -1,0 +1,116 @@
+name: Autonomous GTA 6 Live Stream Scout & Auto-Clipping Shorts Engine
+
+on:
+  schedule:
+    # Runs every 2 hours around the clock (100% autonomous cloud autopilot)
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry Run (Render video but do NOT upload to YouTube)'
+        type: boolean
+        required: false
+        default: false
+      target_streamer:
+        description: 'Specific VIP streamer name (leave empty to scan all)'
+        type: string
+        required: false
+        default: ''
+      custom_url:
+        description: 'Direct YouTube stream/VOD URL to clip on-demand'
+        type: string
+        required: false
+        default: ''
+      max_shorts:
+        description: 'Max shorts to generate in this run'
+        type: choice
+        options: ['1', '2', '3', '5']
+        default: '2'
+      force:
+        description: 'Force process even if previously clipped'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  scout_and_publish:
+    name: Scout, Clip, Curate & Auto-Publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install System Dependencies (FFmpeg & Fonts)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg fonts-liberation fonts-dejavu fonts-noto-color-emoji
+          echo "FFmpeg installed successfully:"
+          ffmpeg -version | head -n 2
+
+      - name: Install Python Requirements
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+
+      - name: Execute Autonomous Pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          MIN_VIEWERS: ${{ vars.MIN_VIEWERS || 2000 }}
+          MIN_VIRAL_SCORE: ${{ vars.MIN_VIRAL_SCORE || 8 }}
+          UPLOAD_PRIVACY_STATUS: ${{ vars.UPLOAD_PRIVACY_STATUS || 'public' }}
+          AUTO_UPLOAD: ${{ vars.AUTO_UPLOAD || 'true' }}
+          LOG_LEVEL: INFO
+        run: |
+          if [ "${{ inputs.custom_url }}" != "" ]; then
+            echo ">>> Running on-demand clip for URL: ${{ inputs.custom_url }}"
+            EXTRA_FLAGS=""
+            if [ "${{ inputs.dry_run }}" = "true" ]; then EXTRA_FLAGS="$EXTRA_FLAGS --dry-run"; fi
+            if [ "${{ inputs.force }}" = "true" ]; then EXTRA_FLAGS="$EXTRA_FLAGS --force"; fi
+            python main.py clip --url "${{ inputs.custom_url }}" $EXTRA_FLAGS
+          else
+            echo ">>> Running autonomous stream radar & curation..."
+            CMD="python main.py run --max-shorts ${{ inputs.max_shorts || 2 }}"
+            if [ "${{ inputs.dry_run }}" = "true" ]; then CMD="$CMD --dry-run"; fi
+            if [ "${{ inputs.force }}" = "true" ]; then CMD="$CMD --force"; fi
+            if [ "${{ inputs.target_streamer }}" != "" ]; then CMD="$CMD --streamer '${{ inputs.target_streamer }}'"; fi
+            eval $CMD
+          fi
+
+      - name: Commit and Push Updated History (Zero Duplicate Protection)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain history.json)" ]; then
+            echo "Changes detected in history.json. Committing..."
+            git add history.json
+            git commit -m "chore(history): update processed video clips archive [skip ci]"
+            git push
+          else
+            echo "No new clips added to history.json. Nothing to commit."
+          fi
+
+      - name: Archive Generated Short Video (Artifact Storage)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-shorts
+          path: output/*.mp4
+          if-no-files-found: ignore
+          retention-days: 3
