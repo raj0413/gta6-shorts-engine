@@ -209,38 +209,73 @@ Respond ONLY with valid, raw JSON (no markdown formatting, no code fences):
             logger.warning("GEMINI_API_KEY not configured. Using rule-based fallback curation.")
             return self._fallback_rule_curation(streamer_name, transcript, keywords)
 
-        # Attempt SDK 1: google.genai (Gemini 2.0 native)
-        try:
-            from google import genai
-            from google.genai import types
+        # Candidate models in priority order (flash-lite has high availability & fast throughput)
+        model_names = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
 
-            client = genai.Client(api_key=self.api_key)
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.7,
-                    response_mime_type="application/json",
-                ),
-            )
-            raw_text = response.text.strip()
-            return self._parse_gemini_json(raw_text)
+        # Strategy 1: Direct Google Generative Language REST API (High reliability, zero extra dependencies)
+        import requests
+        for m_name in model_names:
+            try:
+                endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{m_name}:generateContent?key={self.api_key}"
+                headers = {"Content-Type": "application/json"}
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.7,
+                        "responseMimeType": "application/json",
+                    },
+                }
+                resp = requests.post(endpoint, headers=headers, json=payload, timeout=20)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        text_val = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        if text_val:
+                            logger.info(f"Successfully evaluated highlight with Gemini model: {m_name}")
+                            return self._parse_gemini_json(text_val)
+                else:
+                    logger.warning(f"Direct REST call to {m_name} returned status {resp.status_code}: {resp.text[:150]}")
+            except Exception as e_req:
+                logger.warning(f"Direct REST call to {m_name} failed: {e_req}")
+                continue
 
-        except Exception as e1:
-            logger.debug(f"google.genai call attempt failed ({e1}), trying google.generativeai fallback...")
+        # Strategy 2: google.genai SDK
+        for m_name in model_names:
+            try:
+                from google import genai
+                from google.genai import types
 
-            # Attempt SDK 2: google.generativeai fallback
+                client = genai.Client(api_key=self.api_key)
+                response = client.models.generate_content(
+                    model=m_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        temperature=0.7,
+                        response_mime_type="application/json",
+                    ),
+                )
+                raw_text = response.text.strip()
+                return self._parse_gemini_json(raw_text)
+            except Exception as e1:
+                logger.debug(f"google.genai call attempt with {m_name} failed: {e1}")
+                continue
+
+        # Strategy 3: google.generativeai SDK fallback
+        for m_name in model_names:
             try:
                 import google.generativeai as gai
                 gai.configure(api_key=self.api_key)
-                model = gai.GenerativeModel("gemini-2.0-flash")
+                model = gai.GenerativeModel(m_name)
                 response = model.generate_content(prompt)
                 raw_text = response.text.strip()
                 return self._parse_gemini_json(raw_text)
-
             except Exception as e2:
-                logger.error(f"Gemini API calls failed: {e2}. Reverting to rule-based curation.")
-                return self._fallback_rule_curation(streamer_name, transcript, keywords)
+                logger.debug(f"google.generativeai call attempt with {m_name} failed: {e2}")
+                continue
+
+        logger.error("All Gemini API model attempts failed. Reverting to rule-based curation.")
+        return self._fallback_rule_curation(streamer_name, transcript, keywords)
 
     def _parse_gemini_json(self, raw_text: str) -> Dict[str, Any]:
         """Cleans and extracts JSON payload from Gemini model response."""
