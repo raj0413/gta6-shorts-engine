@@ -2,8 +2,7 @@ name: Autonomous GTA 6 Live Stream Scout & Auto-Clipping Shorts Engine
 
 on:
   schedule:
-    # Scout check every 2 hours (lightweight, ~1 min each = 360 min/month)
-    # Full pipeline only triggers when a live stream is found
+    # Scout check every 2 hours
     - cron: '0 */2 * * *'
   workflow_dispatch:
     inputs:
@@ -36,18 +35,36 @@ on:
 permissions:
   contents: write
 
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 1: Parallel Scout — each streamer checked simultaneously (matrix)
+# Lightweight: only requests + dotenv, no FFmpeg/Whisper
+# ─────────────────────────────────────────────────────────────────────────────
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 1: Lightweight Scout (~1-2 min) — runs every 2 hours on schedule
-  # Only checks if any VIP is live with 2000+ viewers. Zero heavy deps.
-  # ─────────────────────────────────────────────────────────────────────────────
   scout:
-    name: "⚡ Lightweight Live Stream Scout"
+    name: "⚡ Scout — ${{ matrix.streamer_name }}"
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      live_found: ${{ steps.check.outputs.live_found }}
-      live_url: ${{ steps.check.outputs.live_url }}
+      any_live: ${{ steps.set_output.outputs.any_live }}
+
+    strategy:
+      fail-fast: false   # Even if one streamer fails, others continue
+      matrix:
+        include:
+          - streamer_name: "IShowSpeed"
+            channel_id: "UCIztMZ_zMKgRB7qChcmHDkQ"
+          - streamer_name: "Kai Cenat"
+            channel_id: "UCO_7wd_XFqRWqOkEqNnvE6w"
+          - streamer_name: "xQc"
+            channel_id: "UCmYey9j8f_tFwOAMcKqTNEQ"
+          - streamer_name: "Techno Gamerz"
+            channel_id: "UCnAthLNaCGKW-XLBnmKuPkA"
+          - streamer_name: "Adin Ross"
+            channel_id: "UCbdO7eGPSFXgGInynXGVUYg"
+          - streamer_name: "Typical Gamer"
+            channel_id: "UCG0Ke8ZBPZM1aH3rSMVVWwQ"
+          - streamer_name: "Summit1g"
+            channel_id: "UCt_UJ4RHp7gE9TfM48RjJig"
 
     steps:
       - name: Checkout Repository
@@ -59,94 +76,144 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install Scout-Only Dependencies (fast, no Whisper/FFmpeg)
-        run: |
-          python -m pip install --upgrade pip --quiet
-          pip install requests python-dotenv --quiet
+      - name: Install Scout-Only Dependencies
+        run: pip install requests --quiet
 
-      - name: Run Scout Check (lightweight)
+      - name: Check if ${{ matrix.streamer_name }} is Live
         id: check
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python - <<'SCOUT_EOF'
           import os, sys, json, requests
 
-          api_key = os.getenv("YOUTUBE_API_KEY", "")
-          
-          # Load streamers
-          with open("streamers.json") as f:
-              streamers = json.load(f)
-          
-          # Load history to avoid re-processing
+          api_key   = os.getenv("YOUTUBE_API_KEY", "")
+          channel_id = "${{ matrix.channel_id }}"
+          name       = "${{ matrix.streamer_name }}"
+
+          # Load history to skip already-clipped streams
           try:
               with open("history.json") as f:
                   history = json.load(f)
-          except:
+          except Exception:
               history = {}
-          
+
+          processed = history.get("processed_videos", {})
           live_found = False
-          live_url = ""
-          
+          live_url   = ""
+
           if api_key:
-              for s in streamers.get("vip_streamers", []):
-                  channel_id = s.get("channel_id", "")
-                  if not channel_id:
-                      continue
-                  try:
-                      resp = requests.get(
-                          "https://www.googleapis.com/youtube/v3/search",
-                          params={
-                              "part": "snippet", "channelId": channel_id,
-                              "eventType": "live", "type": "video",
-                              "key": api_key
-                          }, timeout=10
-                      )
-                      data = resp.json()
-                      items = data.get("items", [])
-                      if items:
-                          vid_id = items[0]["id"].get("videoId", "")
-                          url = f"https://www.youtube.com/watch?v={vid_id}"
-                          if vid_id and vid_id not in history:
-                              print(f"[LIVE FOUND] {s['name']} → {url}")
-                              live_found = True
-                              live_url = url
-                              break
-                  except Exception as e:
-                      print(f"[WARN] API error for {s.get('name')}: {e}")
+              try:
+                  resp = requests.get(
+                      "https://www.googleapis.com/youtube/v3/search",
+                      params={
+                          "part": "snippet", "channelId": channel_id,
+                          "eventType": "live", "type": "video",
+                          "key": api_key
+                      }, timeout=10
+                  )
+                  items = resp.json().get("items", [])
+                  if items:
+                      vid_id = items[0]["id"].get("videoId", "")
+                      title  = items[0]["snippet"].get("title", "")
+                      url    = f"https://www.youtube.com/watch?v={vid_id}"
+
+                      # Check if this stream has ANY unclipped potential left
+                      # (stream is counted as fresh if < 3 clips already made from it)
+                      existing_clips = len(processed.get(vid_id, {}).get("clips", []))
+                      if vid_id and existing_clips < 3:
+                          print(f"[LIVE] {name} is live! Clips so far: {existing_clips}/3 → {url}")
+                          live_found = True
+                          live_url   = url
+                      elif vid_id:
+                          print(f"[SKIP] {name} live but already clipped {existing_clips} times → skipping")
+                      else:
+                          print(f"[OFFLINE] {name} not live right now")
+              except Exception as e:
+                  print(f"[ERROR] {name}: {e}")
           else:
-              # No API key: use yt-dlp fallback (skipped in scout to save time)
-              print("[INFO] No YOUTUBE_API_KEY — scout skipped (yt-dlp handled in full pipeline)")
-              # Still trigger if manually dispatched
-              if "${{ github.event_name }}" == "workflow_dispatch":
-                  live_found = True
-          
+              print("[WARN] No YOUTUBE_API_KEY set — skipping API scout")
+
+          # Write result for next step
+          with open("scout_result_${{ matrix.streamer_name }}.txt".replace(" ", "_"), "w") as f:
+              f.write(f"live={str(live_found).lower()}\nurl={live_url}\nname={name}\n")
+
           if live_found:
               print(f"::set-output name=live_found::true")
               print(f"::set-output name=live_url::{live_url}")
+              print(f"::set-output name=streamer::{name}")
           else:
-              print("[INFO] No live streams found this check. Skipping full pipeline. ✅")
               print(f"::set-output name=live_found::false")
-              print(f"::set-output name=live_url::")
           SCOUT_EOF
 
-      - name: Scout Summary
-        run: |
-          echo "Live found: ${{ steps.check.outputs.live_found }}"
-          echo "Live URL: ${{ steps.check.outputs.live_url }}"
+      - name: Upload Scout Result
+        if: steps.check.outputs.live_found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-${{ matrix.streamer_name }}
+          path: scout_result_*.txt
+          retention-days: 1
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 2: Full Pipeline (~15-20 min) — ONLY runs when scout finds a live stream
-  # or when manually triggered via workflow_dispatch
+  # JOB 2: Collect all scout results — decide who to clip
+  # ─────────────────────────────────────────────────────────────────────────────
+  collect:
+    name: "📋 Collect Live Streams"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: scout
+    outputs:
+      has_live: ${{ steps.collect.outputs.has_live }}
+      live_urls: ${{ steps.collect.outputs.live_urls }}
+
+    steps:
+      - name: Download All Scout Results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: scout-*
+          merge-multiple: true
+          path: scout_results/
+        continue-on-error: true
+
+      - name: Parse Results
+        id: collect
+        run: |
+          python - <<'EOF'
+          import os, json, glob
+
+          results = glob.glob("scout_results/scout_result_*.txt")
+          live_streams = []
+
+          for f in results:
+              data = {}
+              with open(f) as fh:
+                  for line in fh:
+                      if "=" in line:
+                          k, v = line.strip().split("=", 1)
+                          data[k] = v
+              if data.get("live") == "true" and data.get("url"):
+                  live_streams.append({"url": data["url"], "name": data["name"]})
+
+          if live_streams:
+              print(f"[FOUND] {len(live_streams)} streamers live: {[s['name'] for s in live_streams]}")
+              print(f"::set-output name=has_live::true")
+              print(f"::set-output name=live_urls::{json.dumps(live_streams)}")
+          else:
+              print("[INFO] No streamers live right now — skipping full pipeline")
+              print(f"::set-output name=has_live::false")
+              print(f"::set-output name=live_urls::[]")
+          EOF
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 3: Full Pipeline — ONLY if live streams found
+  # Runs ONCE and processes all live streams found
   # ─────────────────────────────────────────────────────────────────────────────
   clip_and_publish:
     name: "🎬 Clip, Curate & Auto-Publish"
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: scout
-    # Only run if live found OR manual trigger
-    if: needs.scout.outputs.live_found == 'true' || github.event_name == 'workflow_dispatch'
+    needs: [scout, collect]
+    if: needs.collect.outputs.has_live == 'true' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout Repository
@@ -164,13 +231,17 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install -y ffmpeg fonts-liberation fonts-dejavu fonts-noto-color-emoji
-          echo "FFmpeg installed successfully:"
           ffmpeg -version | head -n 2
 
       - name: Install Python Requirements
         run: |
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
+
+      - name: Show Live Streams Found
+        run: |
+          echo "Live streams to process:"
+          echo '${{ needs.collect.outputs.live_urls }}' | python -m json.tool || echo "(manual trigger)"
 
       - name: Execute Autonomous Pipeline
         env:
@@ -184,40 +255,61 @@ jobs:
           UPLOAD_PRIVACY_STATUS: ${{ vars.UPLOAD_PRIVACY_STATUS || 'public' }}
           AUTO_UPLOAD: ${{ vars.AUTO_UPLOAD || 'true' }}
           LOG_LEVEL: INFO
+          LIVE_STREAMS_JSON: ${{ needs.collect.outputs.live_urls }}
         run: |
           if [ "${{ inputs.custom_url }}" != "" ]; then
-            echo ">>> Running on-demand clip for URL: ${{ inputs.custom_url }}"
+            echo ">>> On-demand clip: ${{ inputs.custom_url }}"
             EXTRA_FLAGS=""
-            if [ "${{ inputs.dry_run }}" = "true" ]; then EXTRA_FLAGS="$EXTRA_FLAGS --dry-run"; fi
-            if [ "${{ inputs.force }}" = "true" ]; then EXTRA_FLAGS="$EXTRA_FLAGS --force"; fi
+            [ "${{ inputs.dry_run }}" = "true" ] && EXTRA_FLAGS="$EXTRA_FLAGS --dry-run"
+            [ "${{ inputs.force }}"   = "true" ] && EXTRA_FLAGS="$EXTRA_FLAGS --force"
             python main.py clip --url "${{ inputs.custom_url }}" $EXTRA_FLAGS
-          elif [ "${{ needs.scout.outputs.live_url }}" != "" ]; then
-            echo ">>> Scout found live stream, clipping: ${{ needs.scout.outputs.live_url }}"
-            python main.py clip --url "${{ needs.scout.outputs.live_url }}"
+
+          elif [ "$LIVE_STREAMS_JSON" != "[]" ] && [ -n "$LIVE_STREAMS_JSON" ]; then
+            echo ">>> Processing ${{ needs.collect.outputs.live_urls }}"
+            # Pass all live stream URLs to main.py
+            python - <<'PYEOF'
+            import os, json, subprocess, sys
+
+            streams = json.loads(os.getenv("LIVE_STREAMS_JSON", "[]"))
+            max_shorts = int("${{ inputs.max_shorts || 2 }}")
+
+            for stream in streams[:3]:   # max 3 streamers per run (YouTube quota guard)
+                url  = stream["url"]
+                name = stream["name"]
+                print(f"\n{'='*60}")
+                print(f"[CLIP] Processing {name}: {url}")
+                print(f"{'='*60}")
+                result = subprocess.run(
+                    [sys.executable, "main.py", "clip", "--url", url,
+                     "--max-shorts", str(max_shorts)],
+                    timeout=900
+                )
+                if result.returncode != 0:
+                    print(f"[WARN] Pipeline exited with code {result.returncode} for {name}")
+            PYEOF
+
           else
-            echo ">>> Running full autonomous scan & curation..."
+            echo ">>> Manual trigger — full scan"
             CMD="python main.py run --max-shorts ${{ inputs.max_shorts || 2 }}"
-            if [ "${{ inputs.dry_run }}" = "true" ]; then CMD="$CMD --dry-run"; fi
-            if [ "${{ inputs.force }}" = "true" ]; then CMD="$CMD --force"; fi
-            if [ "${{ inputs.target_streamer }}" != "" ]; then CMD="$CMD --streamer '${{ inputs.target_streamer }}'"; fi
+            [ "${{ inputs.dry_run }}"        = "true" ] && CMD="$CMD --dry-run"
+            [ "${{ inputs.force }}"          = "true" ] && CMD="$CMD --force"
+            [ -n "${{ inputs.target_streamer }}" ] && CMD="$CMD --streamer '${{ inputs.target_streamer }}'"
             eval $CMD
           fi
 
-      - name: Commit and Push Updated History (Zero Duplicate Protection)
+      - name: Commit Updated History
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if [ -n "$(git status --porcelain history.json)" ]; then
-            echo "Changes detected in history.json. Committing..."
             git add history.json
-            git commit -m "chore(history): update processed video clips archive [skip ci]"
+            git commit -m "chore(history): update processed clips archive [skip ci]"
             git push
           else
-            echo "No new clips added to history.json. Nothing to commit."
+            echo "No new clips — nothing to commit."
           fi
 
-      # Artifact storage ONLY on manual dry-run inspection (0 MB storage consumed during auto-publish)
-      - name: Archive Dry-Run Video Preview
+      - name: Archive Dry-Run Preview
         if: ${{ inputs.dry_run == true }}
         uses: actions/upload-artifact@v4
         with:
