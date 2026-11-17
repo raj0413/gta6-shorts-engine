@@ -186,7 +186,7 @@ CRITICAL RULES:
    - 9-10: Mindblowing, hilarious, streamer screaming/rage, unexpected fail, insane glitch/easter egg.
    - 8: Very entertaining, clutch play, viral meme moment.
    - 1-7: Boring, silent gameplay, repetitive, uninspired conversation.
-2. Safety check: Reject extreme hate speech, slurs, or sexual content (mark UNSAFE). Gaming banter/profanity is acceptable (mark SAFE).
+2. Safety & Copyright check: Reject extreme hate speech, slurs, sexual content, or full-length copyrighted song performances (mark UNSAFE). Gaming banter, yelling, humor, and gameplay sound are completely SAFE.
 3. YouTube Short Title: Must be under 60 characters, ultra-clickable, high CTR, all caps or title case with 1-2 punchy emojis (e.g. 💀, 😭, 😱, 🔥).
 4. Hook Text: 2 to 4 words punchy on-screen caption hook (e.g., "HE REALLY DID THIS 💀", "WAIT FOR THE END 😭", "BRO IS NOT SURVIVING THIS").
 5. Description: 2-3 lines with streamer credit, original link placeholder, and clean fair-use disclaimer.

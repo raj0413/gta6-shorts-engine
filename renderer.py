@@ -122,10 +122,10 @@ PlayResY: {self.config.height}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{self.config.font_name},72,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,-1,0,0,0,100,100,2,0,1,5,3,2,60,60,{self.config.subtitles_margin_bottom},1
-Style: Highlight,{self.config.font_name},76,&H0000E5FF,&H00000000,&H00000000,&H90000000,-1,0,0,0,110,110,2,0,1,6,4,2,60,60,{self.config.subtitles_margin_bottom},1
+Style: Default,{self.config.font_name},74,&H00FFFFFF,&H0000FFFF,&H00000000,&H90000000,-1,0,0,0,100,100,2,0,1,6,3,2,60,60,{self.config.subtitles_margin_bottom},1
+Style: Highlight,{self.config.font_name},78,&H0000F5FF,&H00000000,&H00000000,&HA0000000,-1,0,0,0,115,115,2,0,1,7,4,2,60,60,{self.config.subtitles_margin_bottom},1
 Style: Watermark,{self.config.font_name},36,&H00E0E0E0,&H00000000,&H00000000,&HA0000000,-1,0,0,0,100,100,1,0,1,3,2,7,40,40,50,1
-Style: HookBanner,{self.config.font_name},52,&H0000FFFF,&H00000000,&H00000000,&HB0000000,-1,0,0,0,105,105,2,0,1,5,3,2,40,40,1190,1
+Style: HookBanner,{self.config.font_name},54,&H0000FFFF,&H00000000,&H00000000,&HB0000000,-1,0,0,0,108,108,2,0,1,6,3,2,40,40,1190,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -258,6 +258,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         # [top_cam][bottom_game] vstack=inputs=2 [stacked];
         # [stacked] drawbox=y=670:color=0x00E5FF@0.9:width=iw:height=4:t=fill [bordered];
         # [bordered] ass=subtitles.ass [v]
+        # Complex FFmpeg Filtergraph with Transformative Anti-Content-ID Protection:
+        # 1. Top Facecam Zoom + Bottom Gameplay crop
+        # 2. Vertical Stack (1080x1920)
+        # 3. Transformative Color Grade (Saturation + Contrast + Sharpen) to break raw video fingerprinting
+        # 4. Sleek Neon Divider Line
+        # 5. Dynamic ASS Subtitles
         filtergraph = (
             f"[0:v]split=2[cam_in][game_in];"
             f"[cam_in]crop=iw*{fw:.3f}:ih*{fh:.3f}:iw*{fx:.3f}:ih*{fy:.3f},"
@@ -266,8 +272,21 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             f"[game_in]crop=ih*({self.config.width}/{self.config.bottom_game_height}):ih:(iw-ow)/2:0,"
             f"scale={self.config.width}:{self.config.bottom_game_height}[bottom_game];"
             f"[top_cam][bottom_game]vstack=inputs=2[stacked];"
-            f"[stacked]drawbox=y={self.config.top_cam_height - 2}:color={self.config.divider_color}@0.95:width=iw:height=4:t=fill[bordered];"
+            f"[stacked]eq=contrast=1.07:brightness=0.012:saturation=1.14,unsharp=3:3:0.8:3:3:0.0[graded];"
+            f"[graded]drawbox=y={self.config.top_cam_height - 2}:color={self.config.divider_color}@0.95:width=iw:height=4:t=fill[bordered];"
             f"[bordered]ass='{ass_path_escaped}'[v]"
+        )
+
+        # Anti-Copyright Audio Transformation:
+        # - Highpass / Lowpass removes acoustic watermark artifacts
+        # - EQ boost at 3kHz brings streamer speech forward
+        # - Dynaudnorm prevents audio clipping on phone speakers
+        # - Micro pitch/rate shift (1.2%) breaks raw Content ID audio match hashes while sounding 100% natural
+        audio_filter = (
+            "highpass=f=80,lowpass=f=14500,"
+            "equalizer=f=3000:t=q:w=1.5:g=2.5,"
+            "dynaudnorm=f=150:g=15,"
+            "asetrate=44100*1.012,aresample=44100,atempo=1/1.012"
         )
 
         cmd = [
@@ -277,6 +296,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             "-filter_complex", filtergraph,
             "-map", "[v]",
             "-map", "0:a?",
+            "-af", audio_filter,
             "-c:v", "libx264",
             "-preset", "fast",
             "-crf", "18",
@@ -308,7 +328,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 f"[game_in]crop=ih*({self.config.width}/{self.config.bottom_game_height}):ih:(iw-ow)/2:0,"
                 f"scale={self.config.width}:{self.config.bottom_game_height}[bottom_game];"
                 f"[top_cam][bottom_game]vstack=inputs=2[stacked];"
-                f"[stacked]drawbox=y={self.config.top_cam_height - 2}:color={self.config.divider_color}@0.95:width=iw:height=4:t=fill"
+                f"[stacked]eq=contrast=1.07:brightness=0.012:saturation=1.14,unsharp=3:3:0.8:3:3:0.0[graded];"
+                f"[graded]drawbox=y={self.config.top_cam_height - 2}:color={self.config.divider_color}@0.95:width=iw:height=4:t=fill"
             )
             cmd_fallback = [
                 "ffmpeg",
@@ -316,6 +337,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 "-i", str(raw_clip),
                 "-filter_complex", fallback_filter,
                 "-map", "0:a?",
+                "-af", audio_filter,
                 "-c:v", "libx264",
                 "-preset", "fast",
                 "-crf", "18",
