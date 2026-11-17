@@ -2,8 +2,8 @@ name: Autonomous GTA 6 Live Stream Scout & Auto-Clipping Shorts Engine
 
 on:
   schedule:
-    # Runs every 2 hours around the clock (100% autonomous cloud autopilot)
-    - cron: '0 */2 * * *'
+    # Runs every 3 hours (8 runs/day - perfectly balanced for 2,000 free minutes/month)
+    - cron: '0 */3 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -106,11 +106,12 @@ jobs:
             echo "No new clips added to history.json. Nothing to commit."
           fi
 
-      - name: Archive Generated Short Video (Artifact Storage)
-        if: always()
+      # Artifact storage ONLY on manual dry-run inspection (0 MB storage consumed during auto-publish)
+      - name: Archive Dry-Run Video Preview
+        if: ${{ inputs.dry_run == true }}
         uses: actions/upload-artifact@v4
         with:
-          name: generated-shorts
+          name: preview-short
           path: output/*.mp4
           if-no-files-found: ignore
-          retention-days: 3
+          retention-days: 1
