@@ -73,9 +73,12 @@ def run_oauth_setup():
             access_type="offline",
         )
     except Exception as e:
-        print(f"[-] Local server flow failed: {e}")
-        print("[*] Trying console authorization flow instead...")
-        credentials = flow.run_console()
+        print(f"[-] Port 8080 flow error ({e}). Trying fallback port...")
+        credentials = flow.run_local_server(
+            port=0,
+            prompt="consent",
+            access_type="offline",
+        )
 
     refresh_token = credentials.refresh_token
     if not refresh_token:
@@ -83,11 +86,25 @@ def run_oauth_setup():
         print("    Try revoking permissions in Google Security and running this script again.")
         return
 
+    # Auto-update .env file
+    env_file = Path(".env")
+    if env_file.exists():
+        content = env_file.read_text(encoding="utf-8")
+        import re
+        content = re.sub(r"YOUTUBE_CLIENT_ID=.*", f"YOUTUBE_CLIENT_ID={credentials.client_id}", content)
+        content = re.sub(r"YOUTUBE_CLIENT_SECRET=.*", f"YOUTUBE_CLIENT_SECRET={credentials.client_secret}", content)
+        if "YOUTUBE_REFRESH_TOKEN=" in content:
+            content = re.sub(r"YOUTUBE_REFRESH_TOKEN=.*", f"YOUTUBE_REFRESH_TOKEN={refresh_token}", content)
+        else:
+            content += f"\nYOUTUBE_REFRESH_TOKEN={refresh_token}\n"
+        env_file.write_text(content, encoding="utf-8")
+        print("[+] Automatically updated .env with your credentials!")
+
     # Output instructions
     print("\n" + "=" * 70)
-    print("SUCCESS! YOUTUBE REFRESH TOKEN GENERATED")
+    print("SUCCESS! YOUTUBE REFRESH TOKEN GENERATED & SAVED")
     print("=" * 70)
-    print("\nCopy and paste these values into your '.env' and GitHub Secrets:\n")
+    print("\nYour credentials for GitHub Secrets:\n")
     print(f"YOUTUBE_CLIENT_ID={credentials.client_id}")
     print(f"YOUTUBE_CLIENT_SECRET={credentials.client_secret}")
     print(f"YOUTUBE_REFRESH_TOKEN={refresh_token}")
