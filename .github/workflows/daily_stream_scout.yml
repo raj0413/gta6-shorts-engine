@@ -138,12 +138,16 @@ jobs:
           with open("scout_result_${{ matrix.streamer_name }}.txt".replace(" ", "_"), "w") as f:
               f.write(f"live={str(live_found).lower()}\nurl={live_url}\nname={name}\n")
 
-          if live_found:
-              print(f"::set-output name=live_found::true")
-              print(f"::set-output name=live_url::{live_url}")
-              print(f"::set-output name=streamer::{name}")
-          else:
-              print(f"::set-output name=live_found::false")
+          import os
+          env_file = os.environ.get("GITHUB_OUTPUT", "")
+          if live_found and env_file:
+              with open(env_file, "a") as ef:
+                  ef.write(f"live_found=true\n")
+                  ef.write(f"live_url={live_url}\n")
+                  ef.write(f"streamer={name}\n")
+          elif env_file:
+              with open(env_file, "a") as ef:
+                  ef.write(f"live_found=false\n")
           SCOUT_EOF
 
       - name: Upload Scout Result
@@ -194,14 +198,16 @@ jobs:
               if data.get("live") == "true" and data.get("url"):
                   live_streams.append({"url": data["url"], "name": data["name"]})
 
-          if live_streams:
-              print(f"[FOUND] {len(live_streams)} streamers live: {[s['name'] for s in live_streams]}")
-              print(f"::set-output name=has_live::true")
-              print(f"::set-output name=live_urls::{json.dumps(live_streams)}")
-          else:
-              print("[INFO] No streamers live right now — skipping full pipeline")
-              print(f"::set-output name=has_live::false")
-              print(f"::set-output name=live_urls::[]")
+          import os
+          env_file = os.environ.get("GITHUB_OUTPUT", "")
+          if live_streams and env_file:
+              with open(env_file, "a") as ef:
+                  ef.write(f"has_live=true\n")
+                  ef.write(f"live_urls={json.dumps(live_streams)}\n")
+          elif env_file:
+              with open(env_file, "a") as ef:
+                  ef.write(f"has_live=false\n")
+                  ef.write(f"live_urls=[]\n")
           EOF
 
   # ─────────────────────────────────────────────────────────────────────────────
