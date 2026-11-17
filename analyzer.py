@@ -21,6 +21,7 @@ import numpy as np
 from config import (
     DEFAULT_CLIP_DURATION,
     TEMP_DIR,
+    get_yt_dlp_cmd,
     is_clip_processed,
     logger,
 )
@@ -90,8 +91,7 @@ class HighlightAnalyzer:
             return expected_chat_file
 
         logger.info(f"Downloading live chat replay for {video_id}...")
-        cmd = [
-            "yt-dlp",
+        cmd = get_yt_dlp_cmd() + [
             "--skip-download",
             "--sub-langs", "live_chat",
             "--write-sub",
@@ -275,8 +275,7 @@ class HighlightAnalyzer:
             return output_file
 
         logger.info(f"Downloading lightweight audio slice for {video_id}...")
-        cmd = [
-            "yt-dlp",
+        cmd = get_yt_dlp_cmd() + [
             "-f", "ba[ext=m4a]/ba[abr<=96]/ba",
             "--no-warnings",
             "-o", str(output_file),
@@ -412,7 +411,7 @@ class HighlightAnalyzer:
 
     def get_stream_duration(self, video_url: str) -> float:
         """Retrieves total duration of the stream/VOD in seconds via yt-dlp."""
-        cmd = ["yt-dlp", "--dump-json", "--skip-download", video_url]
+        cmd = get_yt_dlp_cmd() + ["--dump-json", "--skip-download", video_url]
         try:
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
             if res.returncode == 0 and res.stdout.strip():

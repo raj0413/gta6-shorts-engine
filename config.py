@@ -78,6 +78,17 @@ GAME_KEYWORDS: List[str] = [k.strip().lower() for k in GAME_KEYWORDS_RAW.split("
 WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "base")
 
 # ---------------------------------------------------------------------------
+# yt-dlp Command Helper (Universal Windows / Linux / Python Module fallback)
+# ---------------------------------------------------------------------------
+def get_yt_dlp_cmd() -> List[str]:
+    """Returns the executable command for running yt-dlp across all platforms."""
+    import shutil
+    if shutil.which("yt-dlp"):
+        return ["yt-dlp"]
+    return [sys.executable, "-m", "yt_dlp"]
+
+
+# ---------------------------------------------------------------------------
 # Logging Configuration
 # ---------------------------------------------------------------------------
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()

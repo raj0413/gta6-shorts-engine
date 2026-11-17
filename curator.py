@@ -19,6 +19,7 @@ from config import (
     MIN_VIRAL_SCORE,
     TEMP_DIR,
     WHISPER_MODEL,
+    get_yt_dlp_cmd,
     logger,
 )
 
@@ -85,8 +86,7 @@ class ViralCurator:
             return wav_file
 
         end_time = start_time + duration
-        cmd_dl = [
-            "yt-dlp",
+        cmd_dl = get_yt_dlp_cmd() + [
             "-f", "ba[ext=m4a]/ba",
             "--download-sections", f"*{start_time}-{end_time}",
             "--no-warnings",

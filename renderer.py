@@ -21,6 +21,7 @@ from config import (
     DEFAULT_CLIP_DURATION,
     OUTPUT_DIR,
     TEMP_DIR,
+    get_yt_dlp_cmd,
     logger,
 )
 
@@ -64,8 +65,7 @@ class VideoRenderer:
         )
 
         # Download best video (up to 1080p) + best audio
-        cmd = [
-            "yt-dlp",
+        cmd = get_yt_dlp_cmd() + [
             "-f", "bv*[height<=1080]+ba/b[height<=1080]/best",
             "--download-sections", f"*{start_time}-{end_time}",
             "--force-keyframes-at-cuts",

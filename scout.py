@@ -19,6 +19,7 @@ from config import (
     STREAMERS_FILE,
     TARGET_GAME,
     YOUTUBE_API_KEY,
+    get_yt_dlp_cmd,
     is_clip_processed,
     load_history,
     load_streamers,
@@ -71,8 +72,7 @@ class StreamScout:
         live_url = streamer.get("live_url") or f"https://www.youtube.com/{streamer.get('handle')}/live"
         logger.info(f"Scouting streamer '{name}' via URL: {live_url}")
 
-        cmd = [
-            "yt-dlp",
+        cmd = get_yt_dlp_cmd() + [
             "--dump-json",
             "--no-playlist",
             "--no-warnings",
@@ -286,8 +286,7 @@ class StreamScout:
         # Strategy 2: yt-dlp search fallback if API produced zero results
         if not discovered:
             try:
-                cmd = [
-                    "yt-dlp",
+                cmd = get_yt_dlp_cmd() + [
                     "--dump-json",
                     "--flat-playlist",
                     "--playlist-items",
@@ -319,7 +318,7 @@ class StreamScout:
     def probe_video_details(self, video_id: str) -> Optional[LiveStream]:
         """Probes a specific video ID or URL to check if it's currently live or a high-viewer stream."""
         url = f"https://www.youtube.com/watch?v={video_id}"
-        cmd = ["yt-dlp", "--dump-json", "--no-warnings", "--skip-download", url]
+        cmd = get_yt_dlp_cmd() + ["--dump-json", "--no-warnings", "--skip-download", url]
         try:
             res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=20)
             if res.returncode != 0 or not res.stdout.strip():
