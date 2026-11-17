@@ -2,8 +2,9 @@ name: Autonomous GTA 6 Live Stream Scout & Auto-Clipping Shorts Engine
 
 on:
   schedule:
-    # Runs every 3 hours (8 runs/day - perfectly balanced for 2,000 free minutes/month)
-    - cron: '0 */3 * * *'
+    # Scout check every 2 hours (lightweight, ~1 min each = 360 min/month)
+    # Full pipeline only triggers when a live stream is found
+    - cron: '0 */2 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -36,10 +37,116 @@ permissions:
   contents: write
 
 jobs:
-  scout_and_publish:
-    name: Scout, Clip, Curate & Auto-Publish
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 1: Lightweight Scout (~1-2 min) — runs every 2 hours on schedule
+  # Only checks if any VIP is live with 2000+ viewers. Zero heavy deps.
+  # ─────────────────────────────────────────────────────────────────────────────
+  scout:
+    name: "⚡ Lightweight Live Stream Scout"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      live_found: ${{ steps.check.outputs.live_found }}
+      live_url: ${{ steps.check.outputs.live_url }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Scout-Only Dependencies (fast, no Whisper/FFmpeg)
+        run: |
+          python -m pip install --upgrade pip --quiet
+          pip install requests python-dotenv --quiet
+
+      - name: Run Scout Check (lightweight)
+        id: check
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python - <<'SCOUT_EOF'
+          import os, sys, json, requests
+
+          api_key = os.getenv("YOUTUBE_API_KEY", "")
+          
+          # Load streamers
+          with open("streamers.json") as f:
+              streamers = json.load(f)
+          
+          # Load history to avoid re-processing
+          try:
+              with open("history.json") as f:
+                  history = json.load(f)
+          except:
+              history = {}
+          
+          live_found = False
+          live_url = ""
+          
+          if api_key:
+              for s in streamers.get("vip_streamers", []):
+                  channel_id = s.get("channel_id", "")
+                  if not channel_id:
+                      continue
+                  try:
+                      resp = requests.get(
+                          "https://www.googleapis.com/youtube/v3/search",
+                          params={
+                              "part": "snippet", "channelId": channel_id,
+                              "eventType": "live", "type": "video",
+                              "key": api_key
+                          }, timeout=10
+                      )
+                      data = resp.json()
+                      items = data.get("items", [])
+                      if items:
+                          vid_id = items[0]["id"].get("videoId", "")
+                          url = f"https://www.youtube.com/watch?v={vid_id}"
+                          if vid_id and vid_id not in history:
+                              print(f"[LIVE FOUND] {s['name']} → {url}")
+                              live_found = True
+                              live_url = url
+                              break
+                  except Exception as e:
+                      print(f"[WARN] API error for {s.get('name')}: {e}")
+          else:
+              # No API key: use yt-dlp fallback (skipped in scout to save time)
+              print("[INFO] No YOUTUBE_API_KEY — scout skipped (yt-dlp handled in full pipeline)")
+              # Still trigger if manually dispatched
+              if "${{ github.event_name }}" == "workflow_dispatch":
+                  live_found = True
+          
+          if live_found:
+              print(f"::set-output name=live_found::true")
+              print(f"::set-output name=live_url::{live_url}")
+          else:
+              print("[INFO] No live streams found this check. Skipping full pipeline. ✅")
+              print(f"::set-output name=live_found::false")
+              print(f"::set-output name=live_url::")
+          SCOUT_EOF
+
+      - name: Scout Summary
+        run: |
+          echo "Live found: ${{ steps.check.outputs.live_found }}"
+          echo "Live URL: ${{ steps.check.outputs.live_url }}"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 2: Full Pipeline (~15-20 min) — ONLY runs when scout finds a live stream
+  # or when manually triggered via workflow_dispatch
+  # ─────────────────────────────────────────────────────────────────────────────
+  clip_and_publish:
+    name: "🎬 Clip, Curate & Auto-Publish"
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    needs: scout
+    # Only run if live found OR manual trigger
+    if: needs.scout.outputs.live_found == 'true' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout Repository
@@ -84,8 +191,11 @@ jobs:
             if [ "${{ inputs.dry_run }}" = "true" ]; then EXTRA_FLAGS="$EXTRA_FLAGS --dry-run"; fi
             if [ "${{ inputs.force }}" = "true" ]; then EXTRA_FLAGS="$EXTRA_FLAGS --force"; fi
             python main.py clip --url "${{ inputs.custom_url }}" $EXTRA_FLAGS
+          elif [ "${{ needs.scout.outputs.live_url }}" != "" ]; then
+            echo ">>> Scout found live stream, clipping: ${{ needs.scout.outputs.live_url }}"
+            python main.py clip --url "${{ needs.scout.outputs.live_url }}"
           else
-            echo ">>> Running autonomous stream radar & curation..."
+            echo ">>> Running full autonomous scan & curation..."
             CMD="python main.py run --max-shorts ${{ inputs.max_shorts || 2 }}"
             if [ "${{ inputs.dry_run }}" = "true" ]; then CMD="$CMD --dry-run"; fi
             if [ "${{ inputs.force }}" = "true" ]; then CMD="$CMD --force"; fi
