@@ -207,6 +207,8 @@ jobs:
 
       - name: Generate GitHub Step Summary (Viewable from Office Mac)
         if: always()
+        env:
+          SCOUTED_STREAMER: ${{ needs.scout.outputs.streamer_name }}
         run: |
           python - <<'SUMMARY_EOF'
           import os, json, glob
@@ -239,7 +241,8 @@ jobs:
                   s.write("| Attribute | Value |\n")
                   s.write("|---|---|\n")
                   s.write(f"| **Target Game** | GTA 5 Live Gameplay |\n")
-                  s.write(f"| **Streamer** | `{last_clip.get('streamer', '${{ needs.scout.outputs.streamer_name || \"Live Streamer\" }}')}` |\n")
+                  streamer_name = last_clip.get('streamer') or os.getenv('SCOUTED_STREAMER', 'Live Streamer')
+                  s.write(f"| **Streamer** | `{streamer_name}` |\n")
                   s.write(f"| **Viral Short Title** | **{last_clip.get('title', 'High-Octane GTA 5 Moment')}** |\n")
                   s.write(f"| **AI Virality Score** | ⭐ `{last_clip.get('viral_score', 9)} / 10` |\n")
                   s.write(f"| **Video File** | `{shorts[0].name if shorts else 'Rendered'}` |\n")
