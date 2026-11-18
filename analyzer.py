@@ -438,16 +438,16 @@ class HighlightAnalyzer:
 
         # 2. If chat yielded fewer than 2 candidates, run audio decibel spike detection
         if len(all_candidates) < 2:
-            logger.info("Chat replay yielded few candidates. Initiating audio decibel spike scan...")
+            logger.info("Chat replay yielded few candidates. Initiating fast audio decibel spike scan...")
             total_duration = self.get_stream_duration(video_url)
 
-            # Analyze the most recent 25-35 minutes if it's a long stream/VOD
-            if total_duration > 1800:
-                scan_start = max(0.0, total_duration - 1800.0)
-                scan_duration = 1800.0
+            # Analyze a fast 120-180s window to avoid timeouts and download delays
+            if total_duration > 180:
+                scan_start = max(0.0, total_duration - 180.0)
+                scan_duration = 180.0
             else:
-                scan_start = 0.0
-                scan_duration = min(total_duration, 1800.0) if total_duration > 0 else 900.0
+                scan_start = 30.0
+                scan_duration = 120.0
 
             audio_path = self.download_audio_segment(
                 video_url, video_id, start_sec=scan_start, duration_sec=scan_duration

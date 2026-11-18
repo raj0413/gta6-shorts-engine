@@ -67,12 +67,16 @@ UPLOAD_PRIVACY_STATUS: str = os.getenv("UPLOAD_PRIVACY_STATUS", "public").lower(
 AUTO_UPLOAD: bool = os.getenv("AUTO_UPLOAD", "true").lower() in ("true", "1", "yes")
 
 # Game Keywords for title matching
-TARGET_GAME: str = os.getenv("TARGET_GAME", "Grand Theft Auto VI")
+TARGET_GAME: str = os.getenv("TARGET_GAME", "Grand Theft Auto V")
 GAME_KEYWORDS_RAW: str = os.getenv(
     "GAME_KEYWORDS",
-    "gta 6,gta vi,grand theft auto 6,grand theft auto vi,gta online,gta v,gta",
+    "gta 6,gta vi,grand theft auto 6,grand theft auto vi,gta 5,gta v,grand theft auto v,gta online,gta rp,gta,gtav",
 )
 GAME_KEYWORDS: List[str] = [k.strip().lower() for k in GAME_KEYWORDS_RAW.split(",") if k.strip()]
+TARGET_SEARCH_QUERY: str = os.getenv(
+    "TARGET_SEARCH_QUERY",
+    "GTA 5 live stream OR GTA V gameplay live OR GTA RP live",
+)
 
 # Whisper Configuration
 WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "base")

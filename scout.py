@@ -18,6 +18,7 @@ from config import (
     MIN_VIEWERS,
     STREAMERS_FILE,
     TARGET_GAME,
+    TARGET_SEARCH_QUERY,
     YOUTUBE_API_KEY,
     get_yt_dlp_cmd,
     is_clip_processed,
@@ -62,8 +63,19 @@ class StreamScout:
         })
 
     def is_game_relevant(self, title: str, description: str = "") -> bool:
-        """Verifies if the stream title or description matches GTA / target game keywords."""
+        """Verifies if the stream title or description matches GTA / target game keywords, excluding static/fake streams."""
         content = f"{title} {description}".lower()
+
+        # Reject static countdowns, timers, 24/7 loops, radio/music
+        blacklist = [
+            "countdown", "timer", "release date", "clock", "waiting for",
+            "24/7", "radio", "lofi", "trailer loop", "trailer reaction",
+            "relaxing", "sleep", "ambient"
+        ]
+        if any(b in content for b in blacklist):
+            logger.info(f"Filtering out non-gameplay/static stream: '{title}'")
+            return False
+
         return any(keyword in content for keyword in GAME_KEYWORDS)
 
     def probe_streamer_scraping(self, streamer: Dict[str, Any]) -> Optional[LiveStream]:
@@ -236,7 +248,7 @@ class StreamScout:
                 search_url = "https://www.googleapis.com/youtube/v3/search"
                 params = {
                     "part": "snippet",
-                    "q": "GTA 6 OR \"Grand Theft Auto VI\" OR GTA VI",
+                    "q": TARGET_SEARCH_QUERY,
                     "eventType": "live",
                     "type": "video",
                     "order": "viewCount",
@@ -286,30 +298,39 @@ class StreamScout:
         # Strategy 2: yt-dlp search fallback if API produced zero results
         if not discovered:
             try:
-                cmd = get_yt_dlp_cmd() + [
-                    "--dump-json",
-                    "--flat-playlist",
-                    "--playlist-items",
-                    str(max_results),
-                    "ytsearch5:GTA 6 live stream",
+                queries = [
+                    f"ytsearch15:{TARGET_GAME} live",
+                    "ytsearch15:GTA 5 live",
+                    "ytsearch15:GTA V gameplay live",
                 ]
-                res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=25)
-                if res.returncode == 0 and res.stdout.strip():
-                    for line in res.stdout.strip().split("\n"):
-                        if not line.strip():
-                            continue
-                        try:
-                            info = json.loads(line)
-                            vid = info.get("id")
-                            title = info.get("title", "")
-                            channel = info.get("uploader") or info.get("channel", "Top Streamer")
-                            if vid and self.is_game_relevant(title):
-                                # Probe individual stream info for accurate live status
-                                individual = self.probe_video_details(vid)
-                                if individual:
-                                    discovered.append(individual)
-                        except Exception:
-                            continue
+                for query in queries:
+                    cmd = get_yt_dlp_cmd() + [
+                        "--dump-json",
+                        "--flat-playlist",
+                        "--playlist-items",
+                        "15",
+                        query,
+                    ]
+                    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=25)
+                    if res.returncode == 0 and res.stdout.strip():
+                        for line in res.stdout.strip().split("\n"):
+                            if not line.strip():
+                                continue
+                            try:
+                                info = json.loads(line)
+                                vid = info.get("id")
+                                title = info.get("title", "")
+                                if vid and self.is_game_relevant(title):
+                                    # Probe individual stream info for accurate live status
+                                    individual = self.probe_video_details(vid)
+                                    if individual and individual.is_active_live and individual.video_id not in [d.video_id for d in discovered]:
+                                        discovered.append(individual)
+                                        if len(discovered) >= max_results:
+                                            break
+                            except Exception:
+                                continue
+                    if discovered:
+                        break
             except Exception as e:
                 logger.debug(f"yt-dlp search fallback error: {e}")
 
