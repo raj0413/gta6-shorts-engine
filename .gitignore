@@ -1,13 +1,15 @@
 # Environment & Secrets
 .env
 client_secrets.json
-token.json
+token*.json
 oauth_credentials.json
 
 # Temporary & Output Directories
 temp/
 output/
 downloads/
+temp_qrcodes/
+temp_qrcodes_8/
 *.mp4
 *.m4a
 *.wav

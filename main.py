@@ -31,7 +31,7 @@ from config import (
 from curator import CurationResult, ViralCurator
 from renderer import RenderConfig, VideoRenderer
 from scout import LiveStream, StreamScout
-from uploader import UploadResult, YouTubeUploader
+from uploader import UploadResult, YouTubeUploader, get_channel_uploaders
 
 
 class ShortsEngineOrchestrator:
@@ -43,18 +43,20 @@ class ShortsEngineOrchestrator:
         min_viewers: int = MIN_VIEWERS,
         max_shorts: int = MAX_SHORTS_PER_RUN,
         force: bool = False,
+        target_channel: Optional[str] = None,
     ):
         self.dry_run = dry_run
         self.min_viewers = min_viewers
         self.max_shorts = max_shorts
         self.force = force
+        self.target_channel = target_channel
 
         # Initialize sub-modules
         self.scout = StreamScout(min_viewers=self.min_viewers)
         self.analyzer = HighlightAnalyzer(target_duration=DEFAULT_CLIP_DURATION)
         self.curator = ViralCurator()
         self.renderer = VideoRenderer()
-        self.uploader = YouTubeUploader()
+        self.uploaders = get_channel_uploaders(target_channel=self.target_channel)
 
     def process_stream(self, stream: LiveStream) -> int:
         """
@@ -131,25 +133,28 @@ class ShortsEngineOrchestrator:
                 continue
 
             # 5. Upload to YouTube (or Dry Run)
-            uploaded_id: Optional[str] = None
+            uploaded_ids: List[str] = []
             if self.dry_run or not AUTO_UPLOAD:
-                logger.info(f"[DRY-RUN] Short rendered at: {rendered_video.absolute()} (Upload bypassed).")
-                uploaded_id = "DRY_RUN_SAVED"
+                for up in self.uploaders:
+                    logger.info(f"[DRY-RUN] Short rendered at: {rendered_video.absolute()} (Upload bypassed for '{up.channel_name}').")
+                uploaded_ids.append("DRY_RUN_SAVED")
             else:
-                upload_res: UploadResult = self.uploader.upload_short(
-                    video_path=rendered_video,
-                    title=curation.short_title,
-                    streamer_name=stream.streamer_name,
-                    streamer_handle=stream.streamer_handle,
-                    stream_url=stream.url,
-                    description=curation.description,
-                    tags=curation.tags,
-                )
-                if upload_res.success:
-                    uploaded_id = upload_res.video_id
-                    logger.info(f"Short published: {upload_res.short_url}")
-                else:
-                    logger.error(f"Failed to publish short: {upload_res.error}")
+                for up in self.uploaders:
+                    upload_res: UploadResult = up.upload_short(
+                        video_path=rendered_video,
+                        title=curation.short_title,
+                        streamer_name=stream.streamer_name,
+                        streamer_handle=stream.streamer_handle,
+                        stream_url=stream.url,
+                        description=curation.description,
+                        tags=curation.tags,
+                    )
+                    if upload_res.success:
+                        if upload_res.video_id:
+                            uploaded_ids.append(f"{up.channel_name}:{upload_res.video_id}")
+                        logger.info(f"[{up.channel_name}] Short published: {upload_res.short_url}")
+                    else:
+                        logger.error(f"[{up.channel_name}] Failed to publish short: {upload_res.error}")
 
             # 6. Update history.json
             record_clip_in_history(
@@ -159,7 +164,7 @@ class ShortsEngineOrchestrator:
                 clip_start=candidate.start_time,
                 clip_end=candidate.end_time,
                 short_title=curation.short_title,
-                short_id=uploaded_id,
+                short_id=",".join(uploaded_ids) if uploaded_ids else None,
                 viral_score=curation.viral_score,
             )
 
@@ -239,6 +244,7 @@ def main():
     run_parser = subparsers.add_parser("run", help="Run full autonomous scout -> clip -> publish cycle")
     run_parser.add_argument("--dry-run", action="store_true", help="Render without publishing to YouTube")
     run_parser.add_argument("--streamer", type=str, help="Target specific streamer from VIP list")
+    run_parser.add_argument("--channel", type=str, help="Target specific YouTube channel from channels.json (e.g. VicePulse)")
     run_parser.add_argument("--max-shorts", type=int, default=MAX_SHORTS_PER_RUN, help="Max shorts to produce")
     run_parser.add_argument("--min-viewers", type=int, default=MIN_VIEWERS, help="Minimum live viewers threshold")
     run_parser.add_argument("--force", action="store_true", help="Bypass history deduplication and AI minimum score")
@@ -250,6 +256,7 @@ def main():
     # Command: clip
     clip_parser = subparsers.add_parser("clip", help="Clip a specific YouTube live stream or VOD URL")
     clip_parser.add_argument("--url", required=True, type=str, help="YouTube video or stream URL")
+    clip_parser.add_argument("--channel", type=str, help="Target specific YouTube channel from channels.json (e.g. VicePulse)")
     clip_parser.add_argument("--streamer", type=str, default="Streamer", help="Streamer name")
     clip_parser.add_argument("--handle", type=str, default="@Streamer", help="Streamer YouTube handle")
     clip_parser.add_argument("--dry-run", action="store_true", help="Render without publishing to YouTube")
@@ -267,6 +274,7 @@ def main():
         engine = ShortsEngineOrchestrator(
             dry_run=args.dry_run,
             force=args.force,
+            target_channel=getattr(args, "channel", None),
         )
         engine.clip_custom_url(
             video_url=args.url,
@@ -280,6 +288,7 @@ def main():
             min_viewers=args.min_viewers,
             max_shorts=args.max_shorts,
             force=args.force,
+            target_channel=getattr(args, "channel", None),
         )
         engine.run_pipeline(target_streamer=args.streamer)
 

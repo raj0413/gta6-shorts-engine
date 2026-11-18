@@ -55,6 +55,8 @@ YOUTUBE_API_KEY: str = os.getenv("YOUTUBE_API_KEY", "").strip()
 YOUTUBE_CLIENT_ID: str = os.getenv("YOUTUBE_CLIENT_ID", "").strip()
 YOUTUBE_CLIENT_SECRET: str = os.getenv("YOUTUBE_CLIENT_SECRET", "").strip()
 YOUTUBE_REFRESH_TOKEN: str = os.getenv("YOUTUBE_REFRESH_TOKEN", "").strip()
+YOUTUBE_REFRESH_TOKEN_VICEPULSE: str = os.getenv("YOUTUBE_REFRESH_TOKEN_VICEPULSE", "").strip()
+YOUTUBE_REFRESH_TOKEN_LEONIDA6: str = os.getenv("YOUTUBE_REFRESH_TOKEN_LEONIDA6", "").strip()
 
 # ---------------------------------------------------------------------------
 # Thresholds & Operational Settings
@@ -133,6 +135,18 @@ def load_channels() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Failed to load channels.json: {e}")
         return []
+
+
+def get_channel_config(channel_identifier: str) -> Optional[Dict[str, Any]]:
+    """Finds channel configuration by name, ID, or handle."""
+    ident = channel_identifier.strip().lower()
+    for ch in load_channels():
+        name = ch.get("channel_name", "").lower()
+        cid = ch.get("channel_id", "").lower()
+        hdl = ch.get("handle", "").lower().lstrip("@")
+        if ident in (name, cid, hdl, f"@{hdl}"):
+            return ch
+    return None
 
 
 def load_history() -> Dict[str, Any]:

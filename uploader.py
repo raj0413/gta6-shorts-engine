@@ -1,10 +1,12 @@
 """
 YouTube Data API v3 OAuth2 Auto-Publisher (uploader.py).
 Publishes rendered Shorts directly to YouTube using headless OAuth2 refresh tokens.
+Supports Multi-Channel publishing (e.g. VicePulse and LEONIDA 6).
 Zero browser interaction required — 100% cloud & GitHub Actions compatible.
 Includes resumable chunked uploading with exponential backoff error recovery.
 """
 
+import json
 import os
 import random
 import time
@@ -19,10 +21,12 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 
 from config import (
+    BASE_DIR,
     UPLOAD_PRIVACY_STATUS,
     YOUTUBE_CLIENT_ID,
     YOUTUBE_CLIENT_SECRET,
     YOUTUBE_REFRESH_TOKEN,
+    get_channel_config,
     load_channels,
     logger,
 )
@@ -43,6 +47,7 @@ class UploadResult:
     short_url: Optional[str]
     title: str
     privacy_status: str
+    channel_name: str = "Default"
     error: Optional[str] = None
 
 
@@ -51,15 +56,67 @@ class YouTubeUploader:
 
     def __init__(
         self,
+        channel: Optional[Dict[str, Any]] = None,
+        channel_name: Optional[str] = None,
         client_id: Optional[str] = None,
         client_secret: Optional[str] = None,
         refresh_token: Optional[str] = None,
-        privacy_status: str = UPLOAD_PRIVACY_STATUS,
+        privacy_status: Optional[str] = None,
     ):
-        self.client_id = client_id or YOUTUBE_CLIENT_ID
-        self.client_secret = client_secret or YOUTUBE_CLIENT_SECRET
-        self.refresh_token = refresh_token or YOUTUBE_REFRESH_TOKEN
-        self.privacy_status = privacy_status.lower()
+        if channel is None and channel_name:
+            channel = get_channel_config(channel_name)
+
+        self.channel = channel or {}
+        self.channel_name = self.channel.get("channel_name", channel_name or "Default")
+        self.channel_id = self.channel.get("channel_id", "")
+
+        resolved_refresh = refresh_token
+        resolved_client_id = client_id or YOUTUBE_CLIENT_ID
+        resolved_client_secret = client_secret or YOUTUBE_CLIENT_SECRET
+
+        # 1. Check channel-specific env variable
+        env_var_name = self.channel.get("env_refresh_token")
+        if not resolved_refresh and env_var_name:
+            resolved_refresh = os.getenv(env_var_name, "").strip()
+
+        # 2. Check channel-specific token JSON file
+        token_file_name = self.channel.get("token_file")
+        if token_file_name:
+            token_path = BASE_DIR / token_file_name
+            if token_path.exists():
+                try:
+                    with open(token_path, "r", encoding="utf-8") as f:
+                        tdata = json.load(f)
+                        if not resolved_refresh:
+                            resolved_refresh = tdata.get("refresh_token")
+                        if not resolved_client_id:
+                            resolved_client_id = tdata.get("client_id")
+                        if not resolved_client_secret:
+                            resolved_client_secret = tdata.get("client_secret")
+                except Exception as e:
+                    logger.warning(f"Error reading token file {token_path}: {e}")
+
+        # 3. Fallback to default token.json if still not resolved
+        if not resolved_refresh:
+            default_token_path = BASE_DIR / "token.json"
+            if default_token_path.exists():
+                try:
+                    with open(default_token_path, "r", encoding="utf-8") as f:
+                        tdata = json.load(f)
+                        resolved_refresh = tdata.get("refresh_token")
+                        if not resolved_client_id:
+                            resolved_client_id = tdata.get("client_id")
+                        if not resolved_client_secret:
+                            resolved_client_secret = tdata.get("client_secret")
+                except Exception:
+                    pass
+
+        self.client_id = resolved_client_id or YOUTUBE_CLIENT_ID
+        self.client_secret = resolved_client_secret or YOUTUBE_CLIENT_SECRET
+        self.refresh_token = resolved_refresh or YOUTUBE_REFRESH_TOKEN
+
+        ch_privacy = self.channel.get("default_privacy")
+        self.privacy_status = (privacy_status or ch_privacy or UPLOAD_PRIVACY_STATUS).lower()
         self._youtube_service = None
 
     def is_configured(self) -> bool:
@@ -73,8 +130,8 @@ class YouTubeUploader:
 
         if not self.is_configured():
             raise ValueError(
-                "YouTube OAuth2 credentials missing. Ensure YOUTUBE_CLIENT_ID, "
-                "YOUTUBE_CLIENT_SECRET, and YOUTUBE_REFRESH_TOKEN are set."
+                f"YouTube OAuth2 credentials missing for channel '{self.channel_name}'. "
+                f"Ensure client credentials and refresh token are set."
             )
 
         try:
@@ -89,13 +146,13 @@ class YouTubeUploader:
 
             # Force token refresh to verify credentials
             creds.refresh(Request())
-            logger.info("OAuth2 access token successfully refreshed.")
+            logger.info(f"OAuth2 access token successfully refreshed for channel '{self.channel_name}'.")
 
             self._youtube_service = build("youtube", "v3", credentials=creds)
             return self._youtube_service
 
         except Exception as e:
-            logger.error(f"Failed to authenticate YouTube API client: {e}")
+            logger.error(f"Failed to authenticate YouTube API client for '{self.channel_name}': {e}")
             raise e
 
     def build_description(
@@ -106,10 +163,11 @@ class YouTubeUploader:
         stream_url: str,
     ) -> str:
         """Builds standardized high-CTR description with attribution and fair use."""
-        channels = load_channels()
-        template = ""
-        if channels:
-            template = channels[0].get("description_template", "")
+        template = self.channel.get("description_template")
+        if not template:
+            channels = load_channels()
+            if channels:
+                template = channels[0].get("description_template", "")
 
         if template:
             try:
@@ -139,7 +197,7 @@ class YouTubeUploader:
         stream_url: str,
         description: str,
         tags: List[str],
-        category_id: str = "20",  # 20 = Gaming
+        category_id: Optional[str] = None,
     ) -> UploadResult:
         """
         Uploads a rendered 9:16 vertical Short to YouTube using resumable chunked upload.
@@ -151,13 +209,14 @@ class YouTubeUploader:
                 short_url=None,
                 title=title,
                 privacy_status=self.privacy_status,
+                channel_name=self.channel_name,
                 error=f"Video file not found at {video_path}",
             )
 
         if not self.is_configured():
             logger.warning(
-                "YouTube OAuth credentials not provided. Video rendered successfully, "
-                "skipping upload (Dry Run mode)."
+                f"YouTube OAuth credentials not provided for channel '{self.channel_name}'. "
+                f"Video rendered successfully, skipping upload (Dry Run mode)."
             )
             return UploadResult(
                 success=True,
@@ -165,6 +224,7 @@ class YouTubeUploader:
                 short_url=f"local://{video_path.name}",
                 title=title,
                 privacy_status="local_only",
+                channel_name=self.channel_name,
             )
 
         try:
@@ -182,12 +242,21 @@ class YouTubeUploader:
             if "#Shorts" not in clean_title and "#shorts" not in clean_title:
                 clean_title = f"{clean_title[:50]} #Shorts"
 
+            # Merge channel tags with AI tags
+            channel_tags = self.channel.get("default_tags", [])
+            merged_tags = list(tags)
+            for ct in channel_tags:
+                if ct not in merged_tags:
+                    merged_tags.append(ct)
+
+            target_category = category_id or self.channel.get("default_category_id", "20")
+
             body = {
                 "snippet": {
                     "title": clean_title[:100],
                     "description": final_description[:4900],
-                    "tags": tags[:30],
-                    "categoryId": category_id,
+                    "tags": merged_tags[:30],
+                    "categoryId": target_category,
                 },
                 "status": {
                     "privacyStatus": self.privacy_status,
@@ -195,7 +264,9 @@ class YouTubeUploader:
                 },
             }
 
-            logger.info(f"Initiating resumable upload for '{clean_title}' to YouTube ({self.privacy_status})...")
+            logger.info(
+                f"Initiating resumable upload to '{self.channel_name}' for '{clean_title}' ({self.privacy_status})..."
+            )
 
             # 5MB chunk size for reliable upload
             media = MediaFileUpload(
@@ -219,21 +290,23 @@ class YouTubeUploader:
                     status, response = request.next_chunk()
                     if status:
                         progress = int(status.progress() * 100)
-                        logger.info(f"Upload progress: {progress}%")
+                        logger.info(f"[{self.channel_name}] Upload progress: {progress}%")
                 except HttpError as e:
                     if e.resp.status in RETRIABLE_STATUS_CODES:
                         retry += 1
                         if retry > MAX_RETRIES:
                             raise e
                         sleep_time = (2 ** retry) + random.random()
-                        logger.warning(f"Retrying upload after status {e.resp.status} in {sleep_time:.1f}s...")
+                        logger.warning(
+                            f"[{self.channel_name}] Retrying upload after status {e.resp.status} in {sleep_time:.1f}s..."
+                        )
                         time.sleep(sleep_time)
                     else:
                         raise e
 
             video_id = response.get("id")
             short_url = f"https://www.youtube.com/shorts/{video_id}"
-            logger.info(f"YOUTUBE SHORT PUBLISHED SUCCESSFULLY! URL: {short_url}")
+            logger.info(f"[{self.channel_name}] SHORT PUBLISHED SUCCESSFULLY! URL: {short_url}")
 
             return UploadResult(
                 success=True,
@@ -241,21 +314,44 @@ class YouTubeUploader:
                 short_url=short_url,
                 title=clean_title,
                 privacy_status=self.privacy_status,
+                channel_name=self.channel_name,
             )
 
         except Exception as e:
-            logger.error(f"YouTube upload failed: {e}")
+            logger.error(f"[{self.channel_name}] YouTube upload failed: {e}")
             return UploadResult(
                 success=False,
                 video_id=None,
                 short_url=None,
                 title=title,
                 privacy_status=self.privacy_status,
+                channel_name=self.channel_name,
                 error=str(e),
             )
 
 
+def get_channel_uploaders(target_channel: Optional[str] = None) -> List[YouTubeUploader]:
+    """
+    Returns configured YouTubeUploader instances.
+    If target_channel is given, returns that specific channel's uploader.
+    Otherwise, returns uploaders for all enabled channels from channels.json.
+    """
+    channels = load_channels()
+    if target_channel:
+        ch = get_channel_config(target_channel)
+        if ch:
+            return [YouTubeUploader(channel=ch)]
+        logger.warning(f"Target channel '{target_channel}' not found. Using default credentials.")
+        return [YouTubeUploader()]
+
+    enabled_channels = [ch for ch in channels if ch.get("enabled", True)]
+    if enabled_channels:
+        return [YouTubeUploader(channel=ch) for ch in enabled_channels]
+
+    return [YouTubeUploader()]
+
+
 if __name__ == "__main__":
-    uploader = YouTubeUploader()
-    configured = uploader.is_configured()
-    print(f"[Uploader Self-Test] Configured: {configured} (Privacy: {uploader.privacy_status})")
+    uploaders = get_channel_uploaders()
+    for u in uploaders:
+        print(f"[Uploader] Channel: '{u.channel_name}' | Configured: {u.is_configured()} (Privacy: {u.privacy_status})")
