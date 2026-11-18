@@ -1,5 +1,16 @@
 [
   {
+    "name": "OpTic Gaming",
+    "handle": "@OpTicGaming",
+    "channel_id": "UCVhkzoReyB25jpFEeXjh3kQ",
+    "custom_url": "https://www.youtube.com/@OpTicGaming",
+    "live_url": "https://www.youtube.com/@OpTicGaming/live",
+    "facecam_position": "top-right",
+    "facecam_box": [0.70, 0.03, 0.28, 0.36],
+    "language": "en",
+    "enabled": true
+  },
+  {
     "name": "IShowSpeed",
     "handle": "@IShowSpeed",
     "channel_id": "UCWsDIT66Ccg_d1H9x_8tBTA",

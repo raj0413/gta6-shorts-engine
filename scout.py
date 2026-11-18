@@ -105,7 +105,7 @@ class StreamScout:
                 return None
 
             info = json.loads(result.stdout.strip().split("\n")[0])
-            is_live = info.get("is_live") or info.get("live_status") == "is_live"
+            is_live = bool(info.get("is_live") or info.get("live_status") in ("is_live", "live") or info.get("concurrent_view_count"))
             if not is_live:
                 logger.debug(f"Streamer '{name}' returned content but is not currently LIVE.")
                 return None
@@ -345,8 +345,9 @@ class StreamScout:
             if res.returncode != 0 or not res.stdout.strip():
                 return None
             info = json.loads(res.stdout.strip().split("\n")[0])
-            is_live = info.get("is_live") or info.get("live_status") == "is_live"
-            viewers = info.get("concurrent_view_count") or info.get("view_count") or 0
+            concurrent = info.get("concurrent_view_count")
+            is_live = bool(info.get("is_live") or info.get("live_status") in ("is_live", "live") or concurrent is not None)
+            viewers = concurrent or info.get("view_count") or 0
             title = info.get("title", "")
             channel = info.get("channel") or info.get("uploader", "Streamer")
 
