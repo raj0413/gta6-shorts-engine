@@ -64,11 +64,10 @@ class VideoRenderer:
             f"({duration:.1f}s) from {video_url}..."
         )
 
-        # Download best video (up to 1080p) + best audio
+        # Download best video (up to 1080p) + best audio using fast HLS m3u8 or DASH formats
         cmd = get_yt_dlp_cmd() + [
-            "-f", "bv*[height<=1080]+ba/b[height<=1080]/best",
+            "-f", "300/301/311+234/312+234/bv*[height<=1080]+ba/best",
             "--download-sections", f"*{start_time}-{end_time}",
-            "--force-keyframes-at-cuts",
             "--no-warnings",
             "-o", str(clip_file),
             video_url,
@@ -104,12 +103,15 @@ class VideoRenderer:
         streamer_handle: str,
         hook_text: str,
         clip_duration: float,
+        channel_name: Optional[str] = None,
+        channel_handle: Optional[str] = None,
     ) -> Path:
         """
         Generates an Advanced SubStation Alpha (.ass) subtitle file featuring:
         1. Word-by-word highlighted karaoke styling.
         2. Streamer attribution watermark banner.
         3. Hook text banner at the top of gameplay section.
+        4. Channel branding watermark.
         """
         ass_content = f"""[Script Info]
 Title: GTA 6 Viral Short
@@ -125,6 +127,7 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
 Style: Default,{self.config.font_name},74,&H00FFFFFF,&H0000FFFF,&H00000000,&H90000000,-1,0,0,0,100,100,2,0,1,6,3,2,60,60,{self.config.subtitles_margin_bottom},1
 Style: Highlight,{self.config.font_name},78,&H0000F5FF,&H00000000,&H00000000,&HA0000000,-1,0,0,0,115,115,2,0,1,7,4,2,60,60,{self.config.subtitles_margin_bottom},1
 Style: Watermark,{self.config.font_name},36,&H00E0E0E0,&H00000000,&H00000000,&HA0000000,-1,0,0,0,100,100,1,0,1,3,2,7,40,40,50,1
+Style: ChannelWatermark,{self.config.font_name},34,&H0000E5FF,&H00000000,&H00000000,&HA0000000,-1,0,0,0,100,100,1,0,1,3,2,9,40,40,50,1
 Style: HookBanner,{self.config.font_name},54,&H0000FFFF,&H00000000,&H00000000,&HB0000000,-1,0,0,0,108,108,2,0,1,6,3,2,40,40,1190,1
 
 [Events]
@@ -140,7 +143,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             f"Dialogue: 1,0:00:00.00,{end_time_str},Watermark,,0,0,0,,{{\\fad(400,400)}}{watermark_text}"
         )
 
-        # 2. Top Hook Banner (Displayed for first 6 seconds)
+        # 2. Channel Branding (Top Right)
+        if channel_handle:
+            clean_ch = channel_handle if channel_handle.startswith("@") else f"@{channel_handle}"
+            events.append(
+                f"Dialogue: 1,0:00:00.00,{end_time_str},ChannelWatermark,,0,0,0,,{{\\fad(400,400)}}{clean_ch}"
+            )
+
+        # 3. Top Hook Banner (Displayed for first 6 seconds)
         if hook_text:
             hook_end_str = self._format_ass_time(min(clip_duration, 6.5))
             events.append(
@@ -155,29 +165,28 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             for i in range(0, len(word_timings), chunk_size):
                 chunks.append(word_timings[i : i + chunk_size])
 
+            last_w_end = 0.0
             for chunk in chunks:
                 if not chunk:
                     continue
 
-                chunk_start = chunk[0]["start"]
-                chunk_end = max(chunk[-1]["end"], chunk_start + 0.6)
-
                 # For each word in this chunk, show line with the active word popped in yellow
                 for active_i, active_word in enumerate(chunk):
-                    w_start = active_word["start"]
-                    w_end = active_word["end"]
-                    if w_end <= w_start:
-                        w_end = w_start + 0.3
+                    raw_start = float(active_word.get("start", 0.0))
+                    raw_end = float(active_word.get("end", 0.0))
+                    w_start = max(last_w_end, raw_start)
+                    w_end = max(w_start + 0.28, raw_end)
+                    last_w_end = w_end
 
                     w_start_str = self._format_ass_time(w_start)
                     w_end_str = self._format_ass_time(w_end)
 
                     parts = []
                     for i, w in enumerate(chunk):
-                        word_str = w["word"].upper()
+                        word_str = w.get("word", "").upper()
                         if i == active_i:
-                            # Active word: Yellow & slightly scaled up
-                            parts.append(f"{{\\c&H0000E5FF&\\fscx115\\fscy115}}{word_str}{{\\c&H00FFFFFF&\\fscx100\\fscy100}}")
+                            # Active word: Neon Yellow-Gold & slightly scaled up
+                            parts.append(f"{{\\c&H0000E5FF&\\fscx112\\fscy112}}{word_str}{{\\c&H00FFFFFF&\\fscx100\\fscy100}}")
                         else:
                             parts.append(word_str)
 
@@ -211,6 +220,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         hook_text: str,
         word_timings: List[Dict[str, Any]],
         output_filename: Optional[str] = None,
+        channel_name: Optional[str] = None,
+        channel_handle: Optional[str] = None,
     ) -> Optional[Path]:
         """
         Executes full composite rendering:
@@ -229,7 +240,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             return None
 
         clean_slug = re.sub(r"[^a-zA-Z0-9_-]", "_", streamer_name)
-        out_name = output_filename or f"short_{clean_slug}_{video_id}_{int(start_time)}.mp4"
+        ch_slug = f"{re.sub(r'[^a-zA-Z0-9_-]', '_', channel_name)}_" if channel_name else ""
+        out_name = output_filename or f"short_{ch_slug}{clean_slug}_{video_id}_{int(start_time)}.mp4"
         final_output = OUTPUT_DIR / out_name
 
         ass_file = TEMP_DIR / f"{video_id}_{int(start_time)}_subs.ass"
@@ -240,6 +252,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             streamer_handle=streamer_handle,
             hook_text=hook_text,
             clip_duration=duration,
+            channel_name=channel_name,
+            channel_handle=channel_handle,
         )
 
         # Default facecam box: normalized [x, y, w, h] (top-right webcam)
@@ -283,10 +297,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         # - Dynaudnorm prevents audio clipping on phone speakers
         # - Micro pitch/rate shift (1.2%) breaks raw Content ID audio match hashes while sounding 100% natural
         audio_filter = (
-            "highpass=f=80,lowpass=f=14500,"
-            "equalizer=f=3000:t=q:w=1.5:g=2.5,"
+            "highpass=f=100,lowpass=f=13500,"
+            "equalizer=f=3000:t=q:w=1.5:g=3.0,"
+            "equalizer=f=250:t=q:w=1.0:g=-2.5,"
             "dynaudnorm=f=150:g=15,"
-            "asetrate=44100*1.012,aresample=44100,atempo=1/1.012"
+            "asetrate=44100*1.038,aresample=44100,atempo=1/1.038"
         )
 
         cmd = [

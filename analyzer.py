@@ -85,10 +85,15 @@ class HighlightAnalyzer:
         """
         output_base = TEMP_DIR / f"{video_id}_chat"
         expected_chat_file = TEMP_DIR / f"{video_id}_chat.live_chat.json"
+        part_chat_file = TEMP_DIR / f"{video_id}_chat.live_chat.json.part"
 
         if expected_chat_file.exists() and expected_chat_file.stat().st_size > 1000:
             logger.info(f"Using cached live chat replay: {expected_chat_file.name}")
             return expected_chat_file
+
+        if part_chat_file.exists() and part_chat_file.stat().st_size > 50000:
+            logger.info(f"Using existing partial live chat replay: {part_chat_file.name}")
+            return part_chat_file
 
         logger.info(f"Downloading live chat replay for {video_id}...")
         cmd = get_yt_dlp_cmd() + [
@@ -100,17 +105,27 @@ class HighlightAnalyzer:
         ]
 
         try:
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
             if expected_chat_file.exists() and expected_chat_file.stat().st_size > 1000:
                 logger.info(f"Live chat replay downloaded: {expected_chat_file.stat().st_size / 1024:.1f} KB")
                 return expected_chat_file
 
+            if part_chat_file.exists() and part_chat_file.stat().st_size > 50000:
+                logger.info(f"Using partial live chat replay ({part_chat_file.stat().st_size / 1024:.1f} KB).")
+                return part_chat_file
+
             # Check if any .json was written with matching base
-            for f in TEMP_DIR.glob(f"{video_id}_chat*.json"):
+            for f in TEMP_DIR.glob(f"{video_id}_chat*.json*"):
                 if f.stat().st_size > 1000:
                     return f
 
             logger.info("Live chat replay not available for this stream (stream may be live or chat disabled).")
+            return None
+        except subprocess.TimeoutExpired:
+            if part_chat_file.exists() and part_chat_file.stat().st_size > 50000:
+                logger.info(f"Live chat download reached 25s window; using captured partial chat ({part_chat_file.stat().st_size / 1024:.1f} KB).")
+                return part_chat_file
+            logger.info("Live chat download timed out with insufficient data.")
             return None
         except Exception as e:
             logger.warning(f"Failed to fetch live chat: {e}")
@@ -209,6 +224,9 @@ class HighlightAnalyzer:
                     break
 
                 peak_time = timestamps[idx]
+                # Skip first 90 seconds (usually stream countdown / starting screen)
+                if peak_time < 90.0:
+                    continue
                 # Check distance from already selected peaks
                 if any(abs(peak_time - ct) < 60 for ct in chosen_timestamps):
                     continue
@@ -269,14 +287,14 @@ class HighlightAnalyzer:
         Uses yt-dlp section downloading to minimize network and disk overhead.
         """
         suffix = f"_{int(start_sec)}_{int(duration_sec)}" if start_sec is not None else "_full"
-        output_file = TEMP_DIR / f"{video_id}{suffix}.m4a"
+        output_file = TEMP_DIR / f"{video_id}{suffix}.mp4"
 
         if output_file.exists() and output_file.stat().st_size > 10000:
             return output_file
 
         logger.info(f"Downloading lightweight audio slice for {video_id}...")
         cmd = get_yt_dlp_cmd() + [
-            "-f", "ba[ext=m4a]/ba[abr<=96]/ba",
+            "-f", "91/92/93/300/301/140/ba",
             "--no-warnings",
             "-o", str(output_file),
         ]
@@ -352,7 +370,8 @@ class HighlightAnalyzer:
             mean_db = float(np.mean(db_arr))
             max_db = float(np.max(db_arr))
             std_db = float(np.std(db_arr))
-            threshold_db = mean_db + (2.0 * std_db)
+            # Dynamic threshold: minimum -6 dB or 1.2x standard deviation above baseline
+            threshold_db = min(-6.0, mean_db + (1.25 * std_db))
 
             logger.info(
                 f"Audio Volume stats: Mean={mean_db:.1f} dB, Max={max_db:.1f} dB, "
@@ -428,6 +447,12 @@ class HighlightAnalyzer:
         2. If chat unavailable or few candidates, downloads recent audio and computes RMS decibel spikes.
         3. Returns combined, de-duplicated candidate windows sorted by virality score.
         """
+        if video_url and ("watch?v=" not in video_url and "youtu" not in video_url) and ("http" in video_id):
+            # Args were passed in reverse order (video_id, video_url)
+            video_url, video_id = video_id, video_url
+
+        clean_id = video_id.split("watch?v=")[-1].split("&")[0].split("/")[-1]
+        video_id = clean_id
         all_candidates: List[HighlightCandidate] = []
 
         # 1. Attempt chat velocity detection
@@ -441,22 +466,35 @@ class HighlightAnalyzer:
             logger.info("Chat replay yielded few candidates. Initiating fast audio decibel spike scan...")
             total_duration = self.get_stream_duration(video_url)
 
-            # Analyze a fast 120-180s window to avoid timeouts and download delays
-            if total_duration > 180:
-                scan_start = max(0.0, total_duration - 180.0)
-                scan_duration = 180.0
+            # Sample representative active gameplay windows across the broadcast
+            scan_windows: List[Tuple[float, float]] = []
+            if total_duration > 7200:
+                # Multi-hour long stream (e.g. 5-10 hrs): scan multiple rich gameplay zones
+                step = total_duration / 7.0
+                scan_windows = [
+                    (round(step * i, 1), 180.0)
+                    for i in range(1, 6)
+                ]
+            elif total_duration > 1800:
+                # Long stream: scan around 30% and 45% where peak gameplay occurs
+                scan_windows = [
+                    (min(2800.0, total_duration * 0.30), 180.0),
+                    (min(3600.0, total_duration * 0.45), 180.0),
+                ]
+            elif total_duration > 180:
+                scan_windows = [(max(0.0, total_duration - 180.0), 180.0)]
             else:
-                scan_start = 30.0
-                scan_duration = 120.0
+                scan_windows = [(30.0, 120.0)]
 
-            audio_path = self.download_audio_segment(
-                video_url, video_id, start_sec=scan_start, duration_sec=scan_duration
-            )
-            if audio_path:
-                audio_candidates = self.analyze_audio_decibels(
-                    audio_path, video_id, offset_seconds=scan_start
+            for scan_start, scan_duration in scan_windows:
+                audio_path = self.download_audio_segment(
+                    video_url, video_id, start_sec=scan_start, duration_sec=scan_duration
                 )
-                all_candidates.extend(audio_candidates)
+                if audio_path:
+                    audio_candidates = self.analyze_audio_decibels(
+                        audio_path, video_id, offset_seconds=scan_start
+                    )
+                    all_candidates.extend(audio_candidates)
 
         # 3. Fallback: If both fail (e.g. stream just started), create a high-probability recent window
         if not all_candidates:

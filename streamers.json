@@ -86,5 +86,27 @@
     "facecam_box": [0.70, 0.03, 0.28, 0.36],
     "language": "en",
     "enabled": true
+  },
+  {
+    "name": "CarryisLive",
+    "handle": "@CarryisLive",
+    "channel_id": "UC0IWazV8s4m5D-7Uj8k1mHA",
+    "custom_url": "https://www.youtube.com/@CarryisLive",
+    "live_url": "https://www.youtube.com/@CarryisLive/live",
+    "facecam_position": "middle-left",
+    "facecam_box": [0.005, 0.335, 0.20, 0.245],
+    "language": "hi",
+    "enabled": true
+  },
+  {
+    "name": "GamerFleet",
+    "handle": "@GamerFleet",
+    "channel_id": "UCqG48J6n20dJv8_rX3P0mQw",
+    "custom_url": "https://www.youtube.com/@GamerFleet",
+    "live_url": "https://www.youtube.com/@GamerFleet/live",
+    "facecam_position": "top-right",
+    "facecam_box": [0.72, 0.0, 0.28, 0.28],
+    "language": "hi",
+    "enabled": true
   }
 ]

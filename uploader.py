@@ -48,6 +48,7 @@ class UploadResult:
     title: str
     privacy_status: str
     channel_name: str = "Default"
+    scheduled_time: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -198,9 +199,12 @@ class YouTubeUploader:
         description: str,
         tags: List[str],
         category_id: Optional[str] = None,
+        publish_at: Optional[str] = None,
     ) -> UploadResult:
         """
         Uploads a rendered 9:16 vertical Short to YouTube using resumable chunked upload.
+        If publish_at (ISO 8601 string, e.g. '2026-11-19T13:30:00Z') is provided,
+        the video will be uploaded as private and scheduled to go public at that time.
         """
         if not video_path.exists():
             return UploadResult(
@@ -251,6 +255,13 @@ class YouTubeUploader:
 
             target_category = category_id or self.channel.get("default_category_id", "20")
 
+            status_payload = {
+                "privacyStatus": "private" if publish_at else self.privacy_status,
+                "selfDeclaredMadeForKids": False,
+            }
+            if publish_at:
+                status_payload["publishAt"] = publish_at
+
             body = {
                 "snippet": {
                     "title": clean_title[:100],
@@ -258,14 +269,12 @@ class YouTubeUploader:
                     "tags": merged_tags[:30],
                     "categoryId": target_category,
                 },
-                "status": {
-                    "privacyStatus": self.privacy_status,
-                    "selfDeclaredMadeForKids": False,
-                },
+                "status": status_payload,
             }
 
+            sched_info = f" [Scheduled: {publish_at}]" if publish_at else f" ({status_payload['privacyStatus']})"
             logger.info(
-                f"Initiating resumable upload to '{self.channel_name}' for '{clean_title}' ({self.privacy_status})..."
+                f"Initiating resumable upload to '{self.channel_name}' for '{clean_title}'{sched_info}..."
             )
 
             # 5MB chunk size for reliable upload
@@ -291,18 +300,17 @@ class YouTubeUploader:
                     if status:
                         progress = int(status.progress() * 100)
                         logger.info(f"[{self.channel_name}] Upload progress: {progress}%")
-                except HttpError as e:
-                    if e.resp.status in RETRIABLE_STATUS_CODES:
-                        retry += 1
-                        if retry > MAX_RETRIES:
-                            raise e
-                        sleep_time = (2 ** retry) + random.random()
-                        logger.warning(
-                            f"[{self.channel_name}] Retrying upload after status {e.resp.status} in {sleep_time:.1f}s..."
-                        )
-                        time.sleep(sleep_time)
-                    else:
+                except (HttpError, OSError, Exception) as e:
+                    if isinstance(e, HttpError) and e.resp.status not in RETRIABLE_STATUS_CODES:
                         raise e
+                    retry += 1
+                    if retry > MAX_RETRIES:
+                        raise e
+                    sleep_time = (2 ** retry) + random.random()
+                    logger.warning(
+                        f"[{self.channel_name}] Network/HTTP hiccup ({e}). Retrying chunk upload ({retry}/{MAX_RETRIES}) in {sleep_time:.1f}s..."
+                    )
+                    time.sleep(sleep_time)
 
             video_id = response.get("id")
             short_url = f"https://www.youtube.com/shorts/{video_id}"
@@ -313,8 +321,9 @@ class YouTubeUploader:
                 video_id=video_id,
                 short_url=short_url,
                 title=clean_title,
-                privacy_status=self.privacy_status,
+                privacy_status="private" if publish_at else self.privacy_status,
                 channel_name=self.channel_name,
+                scheduled_time=publish_at,
             )
 
         except Exception as e:

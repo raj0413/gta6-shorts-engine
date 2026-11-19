@@ -3,6 +3,9 @@
 client_secrets.json
 token*.json
 oauth_credentials.json
+cookies.txt
+all_8_channels.json
+all_user_channels.json
 
 # Temporary & Output Directories
 temp/

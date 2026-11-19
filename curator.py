@@ -64,6 +64,8 @@ class ViralCurator:
         if self._whisper_model is None:
             logger.info(f"Loading OpenAI Whisper model ('{self.model_size}')...")
             try:
+                import torch
+                torch.set_num_threads(4)
                 import whisper
                 self._whisper_model = whisper.load_model(self.model_size)
                 logger.info("Whisper model loaded successfully.")
@@ -87,7 +89,7 @@ class ViralCurator:
 
         end_time = start_time + duration
         cmd_dl = get_yt_dlp_cmd() + [
-            "-f", "ba[ext=m4a]/ba",
+            "-f", "300/301/234/140/ba[ext=m4a]/ba",
             "--download-sections", f"*{start_time}-{end_time}",
             "--no-warnings",
             "-o", str(raw_m4a),
@@ -121,7 +123,9 @@ class ViralCurator:
             logger.error(f"Error extracting audio slice: {e}")
             return None
 
-    def transcribe(self, audio_path: Path) -> Tuple[str, List[Dict[str, Any]]]:
+    def transcribe(
+        self, audio_path: Path, language: Optional[str] = None
+    ) -> Tuple[str, List[Dict[str, Any]]]:
         """
         Transcribes audio file using Whisper, extracting word-level timestamps.
         Returns (full_transcript_text, list_of_word_timing_dicts).
@@ -133,10 +137,16 @@ class ViralCurator:
 
         try:
             logger.info(f"Transcribing audio with word-level timestamps ({audio_path.name})...")
+            transcribe_kwargs = {
+                "word_timestamps": True,
+                "fp16": False,
+            }
+            if language and language in ("hi", "en", "es", "fr", "de"):
+                transcribe_kwargs["language"] = language
+
             result = model.transcribe(
                 str(audio_path),
-                word_timestamps=True,
-                fp16=False,
+                **transcribe_kwargs,
             )
 
             text = result.get("text", "").strip()
@@ -182,10 +192,11 @@ STREAM CONTEXT:
 - Audio Transcript: "{transcript}"
 
 CRITICAL RULES:
-1. Rate virality on a strict 1-10 scale.
-   - 9-10: Mindblowing, hilarious, streamer screaming/rage, unexpected fail, insane glitch/easter egg.
-   - 8: Very entertaining, clutch play, viral meme moment.
-   - 1-7: Boring, silent gameplay, repetitive, uninspired conversation.
+1. Rate virality on a 1-10 scale.
+   - 8-10: Mindblowing, hilarious, streamer screaming/rage, unexpected fail, insane glitch, or funny Hindi/English banter.
+   - 7: Good entertaining moment, clutch play, viral meme moment.
+   - 1-6: Boring, completely silent, or repetitive.
+   - NOTE: If the streamer speaks Hindi/Hinglish (e.g. CarryisLive, GamerFleet), understand and evaluate their comedic roasts, emotional yelling, and gamer slang. Funny or energetic Hindi gaming commentary has MASSIVE viral appeal!
 2. Safety & Copyright check: Reject extreme hate speech, slurs, sexual content, or full-length copyrighted song performances (mark UNSAFE). Gaming banter, yelling, humor, and gameplay sound are completely SAFE.
 3. YouTube Short Title: Must be under 60 characters, ultra-clickable, high CTR, all caps or title case with 1-2 punchy emojis (e.g. 💀, 😭, 😱, 🔥).
 4. Hook Text: 2 to 4 words punchy on-screen caption hook (e.g., "HE REALLY DID THIS 💀", "WAIT FOR THE END 😭", "BRO IS NOT SURVIVING THIS").
@@ -197,8 +208,8 @@ Respond ONLY with valid, raw JSON (no markdown formatting, no code fences):
   "viral_score": 9,
   "verdict": "APPROVED",
   "reason": "Clear explanation of why this moment will retain viewers.",
-  "short_title": "SPEED CRASHES THE FIRST GTA 6 PLANE 💀😭",
-  "hook_text": "BRO DID NOT SEE THIS COMING 💀",
+  "short_title": "CARRYMINATI CRAZY GTA 6 CLUTCH 💀🔥",
+  "hook_text": "WAIT FOR THE END 💀",
   "description": "The most insane GTA 6 moment yet! \\n\\n👑 Streamer: {streamer_name} \\n\\n#Shorts #GTA6 #Gaming #ViralClips",
   "tags": ["Shorts", "GTA 6", "GTA VI", "{streamer_name}", "Gaming Clips", "Funny Moments", "GTA 6 Gameplay"],
   "safety_rating": "SAFE"
@@ -210,7 +221,7 @@ Respond ONLY with valid, raw JSON (no markdown formatting, no code fences):
             return self._fallback_rule_curation(streamer_name, transcript, keywords)
 
         # Candidate models in priority order (flash-lite has high availability & fast throughput)
-        model_names = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
+        model_names = ["gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-flash-latest"]
 
         # Strategy 1: Direct Google Generative Language REST API (High reliability, zero extra dependencies)
         import requests
@@ -327,6 +338,7 @@ Respond ONLY with valid, raw JSON (no markdown formatting, no code fences):
         duration: float,
         keywords: List[str],
         spike_type: str,
+        language: Optional[str] = None,
     ) -> CurationResult:
         """
         Executes complete curation pipeline:
@@ -343,7 +355,7 @@ Respond ONLY with valid, raw JSON (no markdown formatting, no code fences):
         word_timings = []
 
         if audio_path:
-            transcript, word_timings = self.transcribe(audio_path)
+            transcript, word_timings = self.transcribe(audio_path, language=language)
             # Cleanup temporary wav
             audio_path.unlink(missing_ok=True)
         else:

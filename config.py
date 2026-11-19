@@ -87,11 +87,29 @@ WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "base")
 # yt-dlp Command Helper (Universal Windows / Linux / Python Module fallback)
 # ---------------------------------------------------------------------------
 def get_yt_dlp_cmd() -> List[str]:
-    """Returns the executable command for running yt-dlp across all platforms."""
+    """Returns the robust executable command for running yt-dlp with Deno JS challenge runtime and cookies."""
     import shutil
-    if shutil.which("yt-dlp"):
-        return ["yt-dlp"]
-    return [sys.executable, "-m", "yt_dlp"]
+    base = ["yt-dlp"] if shutil.which("yt-dlp") else [sys.executable, "-m", "yt_dlp"]
+
+    # Detect Deno JS runtime (handles YouTube 2024/2025/2026 challenge checks)
+    deno_path = shutil.which("deno")
+    if not deno_path:
+        localapp = os.environ.get("LOCALAPPDATA", "")
+        fallback_deno = Path(localapp) / "Microsoft" / "WinGet" / "Links" / "deno.exe"
+        if fallback_deno.exists():
+            deno_path = str(fallback_deno)
+
+    if deno_path:
+        base.extend(["--js-runtimes", f"deno:{deno_path}", "--remote-components", "ejs:github"])
+    elif shutil.which("node"):
+        base.extend(["--js-runtimes", "node"])
+
+    # Pass cookies.txt if present
+    cookie_file = BASE_DIR / "cookies.txt"
+    if cookie_file.exists():
+        base.extend(["--cookies", str(cookie_file)])
+
+    return base
 
 
 # ---------------------------------------------------------------------------

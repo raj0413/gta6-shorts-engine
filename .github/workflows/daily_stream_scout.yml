@@ -6,11 +6,34 @@ on:
     - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
+      custom_url:
+        description: 'Direct YouTube stream/VOD URL to clip (e.g. CarryMinati stream: https://www.youtube.com/watch?v=irNhWMG560k)'
+        type: string
+        required: false
+        default: 'https://www.youtube.com/watch?v=irNhWMG560k'
+      target_channel:
+        description: 'Target Channel to Publish'
+        type: choice
+        options:
+          - 'All Channels'
+          - 'VicePulse'
+          - 'LEONIDA 6'
+        default: 'All Channels'
       dry_run:
-        description: 'Dry Run (Render video but do NOT upload to YouTube)'
+        description: 'Dry Run (Check to render ONLY without uploading to YouTube)'
         type: boolean
         required: false
-        default: true
+        default: false
+      max_shorts:
+        description: 'Max shorts to generate in this run'
+        type: choice
+        options: ['1', '2', '3']
+        default: '1'
+      force:
+        description: 'Force process even if previously clipped in history'
+        type: boolean
+        required: false
+        default: false
       save_artifact:
         description: 'Save .mp4 video artifact (WARNING: Consumes GitHub artifact storage)'
         type: boolean
@@ -21,21 +44,6 @@ on:
         type: string
         required: false
         default: ''
-      custom_url:
-        description: 'Direct YouTube stream/VOD URL to clip on-demand'
-        type: string
-        required: false
-        default: ''
-      max_shorts:
-        description: 'Max shorts to generate in this run'
-        type: choice
-        options: ['1', '2', '3']
-        default: '1'
-      force:
-        description: 'Force process even if previously clipped'
-        type: boolean
-        required: false
-        default: false
 
 permissions:
   contents: write
@@ -180,24 +188,31 @@ jobs:
           MIN_VIEWERS: ${{ vars.MIN_VIEWERS || 500 }}
           MIN_VIRAL_SCORE: ${{ vars.MIN_VIRAL_SCORE || 6 }}
           UPLOAD_PRIVACY_STATUS: ${{ vars.UPLOAD_PRIVACY_STATUS || 'public' }}
-          # TODAY: Respect dry_run input (defaults to true) and AUTO_UPLOAD=false
-          AUTO_UPLOAD: "false"
+          # Auto-upload enabled unless explicitly running in dry-run mode
+          AUTO_UPLOAD: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run == true) && 'false' || 'true' }}
           LOG_LEVEL: INFO
           TARGET_URL: ${{ inputs.custom_url || needs.scout.outputs.live_url }}
         run: |
           echo "============================================================"
           echo "🚀 STARTING SHORTS ENGINE EXECUTION"
-          echo "   Target URL: $TARGET_URL"
-          echo "   Dry Run:    ${{ inputs.dry_run }}"
+          echo "   Target URL:     $TARGET_URL"
+          echo "   Target Channel: ${{ inputs.target_channel || 'All Channels' }}"
+          echo "   Dry Run:        ${{ inputs.dry_run }}"
           echo "============================================================"
 
           if [ -n "$TARGET_URL" ]; then
-            CMD="python main.py clip --url \"$TARGET_URL\" --max-shorts ${{ inputs.max_shorts || 1 }}"
+            CMD="python main.py clip --url \"$TARGET_URL\""
           else
-            CMD="python main.py run --max-shorts ${{ inputs.max_shorts || 1 }}"
+            CMD="python main.py run"
           fi
 
-          if [ "${{ inputs.dry_run }}" != "false" ]; then
+          if [ -n "${{ inputs.target_channel }}" ] && [ "${{ inputs.target_channel }}" != "All Channels" ]; then
+            CMD="$CMD --channel \"${{ inputs.target_channel }}\""
+          fi
+
+          CMD="$CMD --max-shorts ${{ inputs.max_shorts || 1 }}"
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
             CMD="$CMD --dry-run"
           fi
           if [ "${{ inputs.force }}" = "true" ]; then

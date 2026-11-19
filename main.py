@@ -25,6 +25,7 @@ from config import (
     OUTPUT_DIR,
     TEMP_DIR,
     is_clip_processed,
+    load_streamers,
     logger,
     record_clip_in_history,
 )
@@ -108,6 +109,7 @@ class ShortsEngineOrchestrator:
                 duration=candidate.duration,
                 keywords=candidate.keywords_found,
                 spike_type=candidate.spike_type,
+                language=stream.language,
             )
 
             if not curation.approved and not self.force:
@@ -115,7 +117,11 @@ class ShortsEngineOrchestrator:
                 continue
 
             # 4. Render 9:16 Vertical Short with facecam and animated subtitles
-            logger.info(f"Rendering 9:16 vertical Short: '{curation.short_title}'...")
+            primary_uploader = self.uploaders[0] if self.uploaders else None
+            ch_name = primary_uploader.channel_name if primary_uploader else None
+            ch_handle = primary_uploader.channel.get("handle") if primary_uploader else None
+
+            logger.info(f"Rendering 9:16 vertical Short: '{curation.short_title}' (Channel: {ch_name or 'General'})...")
             rendered_video = self.renderer.render_short(
                 video_url=stream.url,
                 video_id=stream.video_id,
@@ -126,6 +132,8 @@ class ShortsEngineOrchestrator:
                 facecam_box=stream.facecam_box,
                 hook_text=curation.hook_text,
                 word_timings=curation.word_timestamps,
+                channel_name=ch_name,
+                channel_handle=ch_handle,
             )
 
             if not rendered_video or not rendered_video.exists():
@@ -217,17 +225,39 @@ class ShortsEngineOrchestrator:
         logger.info(f"Manually clipping custom stream URL: {video_url}")
         details = self.scout.probe_video_details(video_url)
 
+        final_streamer = details.streamer_name if details and details.streamer_name and details.streamer_name != "Streamer" else streamer_name
+        final_handle = details.streamer_handle if details and details.streamer_handle and details.streamer_handle != "@Streamer" else streamer_handle
+
+        # Match facecam configuration from streamers.json
+        streamers_list = load_streamers()
+        matched = next(
+            (s for s in streamers_list if s.get("name", "").lower() in final_streamer.lower() or final_streamer.lower() in s.get("name", "").lower()),
+            None
+        )
+        facecam_pos = matched.get("facecam_position", "top-right") if matched else "top-right"
+        facecam_box = matched.get("facecam_box", [0.70, 0.03, 0.28, 0.36]) if matched else [0.70, 0.03, 0.28, 0.36]
+        stream_lang = matched.get("language", "en") if matched else "en"
+
+        vid = details.video_id if details else None
+        if not vid:
+            if "watch?v=" in video_url:
+                vid = video_url.split("watch?v=")[-1].split("&")[0]
+            elif "youtu.be/" in video_url:
+                vid = video_url.split("youtu.be/")[-1].split("?")[0]
+            else:
+                vid = "custom_clip"
+
         stream = LiveStream(
-            video_id=details.video_id if details else "custom_clip",
-            streamer_name=details.streamer_name if details else streamer_name,
+            video_id=vid,
+            streamer_name=final_streamer,
             channel_id=details.channel_id if details else "",
-            streamer_handle=details.streamer_handle if details else streamer_handle,
+            streamer_handle=final_handle,
             title=details.title if details else "GTA 6 Live Gameplay Highlight",
             url=video_url,
             concurrent_viewers=details.concurrent_viewers if details else 5000,
-            facecam_position="top-right",
-            facecam_box=[0.70, 0.03, 0.28, 0.36],
-            language="en",
+            facecam_position=facecam_pos,
+            facecam_box=facecam_box,
+            language=stream_lang,
             is_active_live=False,
         )
 
@@ -259,6 +289,7 @@ def main():
     clip_parser.add_argument("--channel", type=str, help="Target specific YouTube channel from channels.json (e.g. VicePulse)")
     clip_parser.add_argument("--streamer", type=str, default="Streamer", help="Streamer name")
     clip_parser.add_argument("--handle", type=str, default="@Streamer", help="Streamer YouTube handle")
+    clip_parser.add_argument("--max-shorts", type=int, default=MAX_SHORTS_PER_RUN, help="Max shorts to produce")
     clip_parser.add_argument("--dry-run", action="store_true", help="Render without publishing to YouTube")
     clip_parser.add_argument("--force", action="store_true", help="Bypass history check")
 
@@ -275,6 +306,7 @@ def main():
             dry_run=args.dry_run,
             force=args.force,
             target_channel=getattr(args, "channel", None),
+            max_shorts=getattr(args, "max_shorts", MAX_SHORTS_PER_RUN),
         )
         engine.clip_custom_url(
             video_url=args.url,

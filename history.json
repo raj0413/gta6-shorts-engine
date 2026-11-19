@@ -1,6 +1,359 @@
 {
   "version": "1.0",
-  "last_updated": "2026-11-16T00:00:00Z",
-  "processed_videos": {},
-  "clips_published": []
+  "last_updated": "2026-11-19T04:21:02.680705+00:00",
+  "processed_videos": {
+    "custom_clip": {
+      "streamer": "CarryisLive",
+      "title": "GTA 6 Live Gameplay Highlight",
+      "first_scouted": "2026-11-18T21:30:41.118090+00:00",
+      "clips": [
+        {
+          "start": 3716.25,
+          "end": 3764.25,
+          "duration": 48.0,
+          "short_title": "CARRYISLIVE'S INSANE GTA 6 REACTION! 😱🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 9,
+          "created_at": "2026-11-18T21:30:41.118090+00:00"
+        }
+      ]
+    },
+    "jbcZwy3CuIQ": {
+      "streamer": "CarryisLive",
+      "title": "GTA PARAMPARA BEGINS | NO PROMOTION",
+      "first_scouted": "2026-11-18T22:00:54.674051+00:00",
+      "clips": [
+        {
+          "start": 2050.0,
+          "end": 2098.0,
+          "duration": 48.0,
+          "short_title": "CARRYISLIVE LOSES IT IN GTA 6 💀🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 8,
+          "created_at": "2026-11-18T22:00:54.674051+00:00"
+        },
+        {
+          "start": 1280.0,
+          "end": 1328.0,
+          "duration": 48.0,
+          "short_title": "CARRYISLIVE LOSES HIS MIND IN GTA 6! 💀🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 9,
+          "created_at": "2026-11-18T22:06:36.340138+00:00"
+        },
+        {
+          "start": 1930.0,
+          "end": 1978.0,
+          "duration": 48.0,
+          "short_title": "CARRY IS LOSING IT IN GTA 6! 💀",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 4,
+          "created_at": "2026-11-18T22:25:51.793594+00:00"
+        }
+      ]
+    },
+    "h3qEwM6k074": {
+      "streamer": "GamerFleet",
+      "title": "GTA VI FIRST LIVESTREAM 😎 | GamerFleet",
+      "first_scouted": "2026-11-18T22:11:19.214202+00:00",
+      "clips": [
+        {
+          "start": 2819.35,
+          "end": 2867.35,
+          "duration": 48.0,
+          "short_title": "GAMERFLEET LOSES IT IN GTA 6! 💀😂",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 8,
+          "created_at": "2026-11-18T22:11:19.214202+00:00"
+        },
+        {
+          "start": 2755.35,
+          "end": 2803.35,
+          "duration": 48.0,
+          "short_title": "GTA 6 IS PURE CHAOS! 💀🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 9,
+          "created_at": "2026-11-18T22:14:51.966482+00:00"
+        },
+        {
+          "start": 3590.25,
+          "end": 3638.25,
+          "duration": 48.0,
+          "short_title": "GAMERFLEET'S GTA 6 MELTDOWN 💀🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 8,
+          "created_at": "2026-11-18T22:32:25.376407+00:00"
+        }
+      ]
+    },
+    "irNhWMG560k": {
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI PLAYS GTA VI | NO PROMOTIONS",
+      "first_scouted": "2026-11-19T02:29:30.520314+00:00",
+      "clips": [
+        {
+          "start": 10193.15,
+          "end": 10241.15,
+          "duration": 48.0,
+          "short_title": "CARRYMINATI LOSES IT IN GTA 6! 💀🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 9,
+          "created_at": "2026-11-19T02:29:30.520314+00:00"
+        },
+        {
+          "start": 20160.65,
+          "end": 20208.65,
+          "duration": 48.0,
+          "short_title": "CARRYMINATI LOSES HIS MIND IN GTA 6 💀🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 8,
+          "created_at": "2026-11-19T02:35:51.238418+00:00"
+        },
+        {
+          "start": 10112.9,
+          "end": 10160.9,
+          "duration": 48.0,
+          "short_title": "CARRYMINATI LOSES IT IN GTA 6! 💀🤣",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 8,
+          "created_at": "2026-11-19T02:40:14.253610+00:00"
+        },
+        {
+          "start": 15259.6,
+          "end": 15307.6,
+          "duration": 48.0,
+          "short_title": "CARRYMINATI LOSES IT IN GTA 6! 💀🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 9,
+          "created_at": "2026-11-19T02:45:47.286041+00:00"
+        },
+        {
+          "start": 15141.35,
+          "end": 15189.35,
+          "duration": 48.0,
+          "short_title": "CARRYMINATI LOSES HIS MIND IN GTA 6 💀🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 8,
+          "created_at": "2026-11-19T02:51:06.655533+00:00"
+        },
+        {
+          "start": 10051.65,
+          "end": 10099.65,
+          "duration": 48.0,
+          "short_title": "CARRYMINATI LOSES HIS MIND IN GTA 6 💀😱",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 9,
+          "created_at": "2026-11-19T03:31:18.870344+00:00"
+        },
+        {
+          "start": 25176.1,
+          "end": 25224.1,
+          "duration": 48.0,
+          "short_title": "CARRYMINATI LOSES IT IN GTA 6! 💀🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 8,
+          "created_at": "2026-11-19T03:40:07.942288+00:00"
+        },
+        {
+          "start": 25290.85,
+          "end": 25338.85,
+          "duration": 48.0,
+          "short_title": "CARRYMINATI LOSES IT IN GTA 6! 💀🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 8,
+          "created_at": "2026-11-19T03:45:47.519238+00:00"
+        },
+        {
+          "start": 5087.95,
+          "end": 5135.95,
+          "duration": 48.0,
+          "short_title": "CARRYMINATI'S CRAZY GTA 6 REACTION 😱🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 9,
+          "created_at": "2026-11-19T03:56:41.995289+00:00"
+        },
+        {
+          "start": 5021.95,
+          "end": 5069.95,
+          "duration": 48.0,
+          "short_title": "CARRYMINATI LOSES IT IN GTA 6! 💀🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 8,
+          "created_at": "2026-11-19T04:05:47.579036+00:00"
+        },
+        {
+          "start": 5183.2,
+          "end": 5231.2,
+          "duration": 48.0,
+          "short_title": "CARRYMINATI'S EMOTIONAL GTA 6 MOMENT 😭🔥",
+          "short_id": "DRY_RUN_SAVED",
+          "viral_score": 8,
+          "created_at": "2026-11-19T04:12:05.533019+00:00"
+        },
+        {
+          "start": 7591.8,
+          "end": 7639.8,
+          "duration": 48.0,
+          "short_title": "CARRYMINATI LOSES IT IN GTA 6! 💀🔥",
+          "short_id": "VicePulse:RqQuUeTRkVk",
+          "viral_score": 9,
+          "created_at": "2026-11-19T04:21:02.680705+00:00"
+        }
+      ]
+    }
+  },
+  "clips_published": [
+    {
+      "video_id": "custom_clip",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYISLIVE'S INSANE GTA 6 REACTION! 😱🔥",
+      "published_at": "2026-11-18T21:30:41.118090+00:00",
+      "viral_score": 9
+    },
+    {
+      "video_id": "jbcZwy3CuIQ",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYISLIVE LOSES IT IN GTA 6 💀🔥",
+      "published_at": "2026-11-18T22:00:54.674051+00:00",
+      "viral_score": 8
+    },
+    {
+      "video_id": "jbcZwy3CuIQ",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYISLIVE LOSES HIS MIND IN GTA 6! 💀🔥",
+      "published_at": "2026-11-18T22:06:36.340138+00:00",
+      "viral_score": 9
+    },
+    {
+      "video_id": "h3qEwM6k074",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "GamerFleet",
+      "title": "GAMERFLEET LOSES IT IN GTA 6! 💀😂",
+      "published_at": "2026-11-18T22:11:19.214202+00:00",
+      "viral_score": 8
+    },
+    {
+      "video_id": "h3qEwM6k074",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "GamerFleet",
+      "title": "GTA 6 IS PURE CHAOS! 💀🔥",
+      "published_at": "2026-11-18T22:14:51.966482+00:00",
+      "viral_score": 9
+    },
+    {
+      "video_id": "jbcZwy3CuIQ",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRY IS LOSING IT IN GTA 6! 💀",
+      "published_at": "2026-11-18T22:25:51.793594+00:00",
+      "viral_score": 4
+    },
+    {
+      "video_id": "h3qEwM6k074",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "GamerFleet",
+      "title": "GAMERFLEET'S GTA 6 MELTDOWN 💀🔥",
+      "published_at": "2026-11-18T22:32:25.376407+00:00",
+      "viral_score": 8
+    },
+    {
+      "video_id": "irNhWMG560k",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI LOSES IT IN GTA 6! 💀🔥",
+      "published_at": "2026-11-19T02:29:30.520314+00:00",
+      "viral_score": 9
+    },
+    {
+      "video_id": "irNhWMG560k",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI LOSES HIS MIND IN GTA 6 💀🔥",
+      "published_at": "2026-11-19T02:35:51.238418+00:00",
+      "viral_score": 8
+    },
+    {
+      "video_id": "irNhWMG560k",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI LOSES IT IN GTA 6! 💀🤣",
+      "published_at": "2026-11-19T02:40:14.253610+00:00",
+      "viral_score": 8
+    },
+    {
+      "video_id": "irNhWMG560k",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI LOSES IT IN GTA 6! 💀🔥",
+      "published_at": "2026-11-19T02:45:47.286041+00:00",
+      "viral_score": 9
+    },
+    {
+      "video_id": "irNhWMG560k",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI LOSES HIS MIND IN GTA 6 💀🔥",
+      "published_at": "2026-11-19T02:51:06.655533+00:00",
+      "viral_score": 8
+    },
+    {
+      "video_id": "irNhWMG560k",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI LOSES HIS MIND IN GTA 6 💀😱",
+      "published_at": "2026-11-19T03:31:18.870344+00:00",
+      "viral_score": 9
+    },
+    {
+      "video_id": "irNhWMG560k",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI LOSES IT IN GTA 6! 💀🔥",
+      "published_at": "2026-11-19T03:40:07.942288+00:00",
+      "viral_score": 8
+    },
+    {
+      "video_id": "irNhWMG560k",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI LOSES IT IN GTA 6! 💀🔥",
+      "published_at": "2026-11-19T03:45:47.519238+00:00",
+      "viral_score": 8
+    },
+    {
+      "video_id": "irNhWMG560k",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI'S CRAZY GTA 6 REACTION 😱🔥",
+      "published_at": "2026-11-19T03:56:41.995289+00:00",
+      "viral_score": 9
+    },
+    {
+      "video_id": "irNhWMG560k",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI LOSES IT IN GTA 6! 💀🔥",
+      "published_at": "2026-11-19T04:05:47.579036+00:00",
+      "viral_score": 8
+    },
+    {
+      "video_id": "irNhWMG560k",
+      "short_id": "DRY_RUN_SAVED",
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI'S EMOTIONAL GTA 6 MOMENT 😭🔥",
+      "published_at": "2026-11-19T04:12:05.533019+00:00",
+      "viral_score": 8
+    },
+    {
+      "video_id": "irNhWMG560k",
+      "short_id": "VicePulse:RqQuUeTRkVk",
+      "streamer": "CarryisLive",
+      "title": "CARRYMINATI LOSES IT IN GTA 6! 💀🔥",
+      "published_at": "2026-11-19T04:21:02.680705+00:00",
+      "viral_score": 9
+    }
+  ]
 }

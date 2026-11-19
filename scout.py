@@ -336,8 +336,15 @@ class StreamScout:
 
         return discovered
 
-    def probe_video_details(self, video_id: str) -> Optional[LiveStream]:
+    def probe_video_details(self, video_input: str) -> Optional[LiveStream]:
         """Probes a specific video ID or URL to check if it's currently live or a high-viewer stream."""
+        if "watch?v=" in video_input:
+            video_id = video_input.split("watch?v=")[-1].split("&")[0]
+        elif "youtu.be/" in video_input:
+            video_id = video_input.split("youtu.be/")[-1].split("?")[0]
+        else:
+            video_id = video_input
+
         url = f"https://www.youtube.com/watch?v={video_id}"
         cmd = get_yt_dlp_cmd() + ["--dump-json", "--no-warnings", "--skip-download", url]
         try:
