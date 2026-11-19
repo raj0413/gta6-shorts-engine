@@ -104,13 +104,13 @@ def get_yt_dlp_cmd() -> List[str]:
     elif shutil.which("node"):
         base.extend(["--js-runtimes", "node"])
 
-    # Pass cookies.txt if present
+    # Pass cookies.txt if present (most reliable method)
     cookie_file = BASE_DIR / "cookies.txt"
     if cookie_file.exists():
         base.extend(["--cookies", str(cookie_file)])
-
-    # Client emulation to avoid Cloud IP bot challenge
-    base.extend(["--extractor-args", "youtube:player_client=android,web"])
+    else:
+        # Fallback client emulation if cookies are not present
+        base.extend(["--extractor-args", "youtube:player_client=ios,web"])
 
     return base
 
