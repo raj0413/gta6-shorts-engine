@@ -109,6 +109,9 @@ def get_yt_dlp_cmd() -> List[str]:
     if cookie_file.exists():
         base.extend(["--cookies", str(cookie_file)])
 
+    # Client emulation to avoid Cloud IP bot challenge
+    base.extend(["--extractor-args", "youtube:player_client=android,web"])
+
     return base
 
 
